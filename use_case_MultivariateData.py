@@ -31,16 +31,18 @@ from sklearn.preprocessing import StandardScaler
 from factor_analyzer import FactorAnalyzer
 from factor_analyzer.factor_analyzer import calculate_bartlett_sphericity
 from factor_analyzer.factor_analyzer import calculate_kmo
+import VisualizeNN as VisNN
+
 
 #----------------------------------------------------------------------------------------------
 
 def app():
 
     # Clear cache
-    st.legacy_caching.clear_cache()
+    #st.legacy_caching.clear_cache()
 
     # Hide traceback in error messages (comment out for de-bugging)
-    sys.tracebacklimit = 0
+    #sys.tracebacklimit = 0
 
     # Show altair tooltip when full screen
     st.markdown('<style>#vg-tooltip-element{z-index: 1000051}</style>',unsafe_allow_html=True)
@@ -63,14 +65,41 @@ def app():
     #Session state
     if 'key' not in st.session_state:
         st.session_state['key'] = 0
+    if 'model_tuning_results' not in st.session_state:
+        st.session_state['model_tuning_results'] = None
+    if 'model_val_results' not in st.session_state:
+        st.session_state['model_val_results'] = None
+    if 'model_full_results' not in st.session_state:
+        st.session_state['model_full_results'] = None
+    if 'full_model_ann_sk' not in st.session_state:
+        st.session_state['full_model_ann_sk'] = None
+    if 'ann_finalPara' not in st.session_state:
+        st.session_state['ann_finalPara'] = None
+    if 'ann_tuning_results' not in st.session_state:
+        st.session_state['ann_tuning_results'] = None
+                                     
     reset_clicked = st.sidebar.button("Reset all your input")
     if reset_clicked:
         st.session_state['key'] = st.session_state['key'] + 1
+        st.session_state['model_tuning_results'] = None
+        st.session_state['model_full_results'] = None
+        st.session_state['full_model_ann_sk'] = None
+        st.session_state['ann_finalPara'] = None
+        st.session_state['ann_tuning_results'] = None
+        st.session_state['model_val_results'] = None
+        st.legacy_caching.clear_cache()
     st.sidebar.markdown("")
-
+    
+    def in_wid_change():
+        st.session_state['model_tuning_results'] = None
+        st.session_state['model_full_results'] = None
+        st.session_state['full_model_ann_sk'] = None
+        st.session_state['ann_finalPara'] = None
+        st.session_state['ann_tuning_results'] = None
+        st.session_state['model_val_results'] = None
 
     # Analysis type
-    analysis_type = st.selectbox("What kind of analysis would you like to conduct?", ["Regression", "Multi-class classification", "Data decomposition"], key = st.session_state['key'])
+    analysis_type = st.selectbox("What kind of analysis would you like to conduct?", ["Regression", "Multi-class classification", "Data decomposition"], key = st.session_state['key'], on_change=in_wid_change)
 
     st.header("**Multivariate data**")
 
@@ -370,11 +399,11 @@ def app():
                 st.markdown("**Data cleaning**")
 
                 # Delete rows
-                delRows =st.selectbox('Delete rows with index ...', options=['-', 'greater', 'greater or equal', 'smaller', 'smaller or equal', 'equal', 'between'], key = st.session_state['key'])
+                delRows =st.selectbox('Delete rows with index ...', options=['-', 'greater', 'greater or equal', 'smaller', 'smaller or equal', 'equal', 'between'], key = st.session_state['key'], on_change=in_wid_change)
                 if delRows!='-':                                
                     if delRows=='between':
-                        row_1=st.number_input('Lower limit is', value=0, step=1, min_value= 0, max_value=len(df)-1, key = st.session_state['key'])
-                        row_2=st.number_input('Upper limit is', value=2, step=1, min_value= 0, max_value=len(df)-1, key = st.session_state['key'])
+                        row_1=st.number_input('Lower limit is', value=0, step=1, min_value= 0, max_value=len(df)-1, key = st.session_state['key'], on_change=in_wid_change)
+                        row_2=st.number_input('Upper limit is', value=2, step=1, min_value= 0, max_value=len(df)-1, key = st.session_state['key'], on_change=in_wid_change)
                         if (row_1 + 1) < row_2 :
                             sb_DM_delRows=df.index[(df.index > row_1) & (df.index < row_2)]
                         elif (row_1 + 1) == row_2 : 
@@ -385,9 +414,9 @@ def app():
                             st.error("ERROR: Lower limit must be smaller than upper limit!")  
                             return                   
                     elif delRows=='equal':
-                        sb_DM_delRows = st.multiselect("to...", df.index, key = st.session_state['key'])
+                        sb_DM_delRows = st.multiselect("to...", df.index, key = st.session_state['key'], on_change=in_wid_change)
                     else:
-                        row_1=st.number_input('than...', step=1, value=1, min_value = 0, max_value=len(df)-1, key = st.session_state['key'])                    
+                        row_1=st.number_input('than...', step=1, value=1, min_value = 0, max_value=len(df)-1, key = st.session_state['key'], on_change=in_wid_change)                    
                         if delRows=='greater':
                             sb_DM_delRows=df.index[df.index > row_1]
                             if row_1 == len(df)-1:
@@ -411,11 +440,11 @@ def app():
                         no_delRows=n_rows-df.shape[0]
 
                 # Keep rows
-                keepRows =st.selectbox('Keep rows with index ...', options=['-', 'greater', 'greater or equal', 'smaller', 'smaller or equal', 'equal', 'between'], key = st.session_state['key'])
+                keepRows =st.selectbox('Keep rows with index ...', options=['-', 'greater', 'greater or equal', 'smaller', 'smaller or equal', 'equal', 'between'], key = st.session_state['key'], on_change=in_wid_change)
                 if keepRows!='-':                                
                     if keepRows=='between':
-                        row_1=st.number_input('Lower limit is', value=0, step=1, min_value= 0, max_value=len(df)-1, key = st.session_state['key'])
-                        row_2=st.number_input('Upper limit is', value=2, step=1, min_value= 0, max_value=len(df)-1, key = st.session_state['key'])
+                        row_1=st.number_input('Lower limit is', value=0, step=1, min_value= 0, max_value=len(df)-1, key = st.session_state['key'], on_change=in_wid_change)
+                        row_2=st.number_input('Upper limit is', value=2, step=1, min_value= 0, max_value=len(df)-1, key = st.session_state['key'], on_change=in_wid_change)
                         if (row_1 + 1) < row_2 :
                             sb_DM_keepRows=df.index[(df.index > row_1) & (df.index < row_2)]
                         elif (row_1 + 1) == row_2 : 
@@ -428,9 +457,9 @@ def app():
                             st.error("ERROR: Lower limit must be smaller than upper limit!")  
                             return                   
                     elif keepRows=='equal':
-                        sb_DM_keepRows = st.multiselect("to...", df.index, key = st.session_state['key'])
+                        sb_DM_keepRows = st.multiselect("to...", df.index, key = st.session_state['key'], on_change=in_wid_change)
                     else:
-                        row_1=st.number_input('than...', step=1, value=1, min_value = 0, max_value=len(df)-1, key = st.session_state['key'])                    
+                        row_1=st.number_input('than...', step=1, value=1, min_value = 0, max_value=len(df)-1, key = st.session_state['key'], on_change=in_wid_change)                    
                         if keepRows=='greater':
                             sb_DM_keepRows=df.index[df.index > row_1]
                             if row_1 == len(df)-1:
@@ -452,17 +481,17 @@ def app():
                         no_keptRows=df.shape[0]
 
                 # Delete columns
-                sb_DM_delCols = st.multiselect("Select columns to delete ", df.columns, key = st.session_state['key'])
+                sb_DM_delCols = st.multiselect("Select columns to delete ", df.columns, key = st.session_state['key'], on_change=in_wid_change)
                 df = df.loc[:,~df.columns.isin(sb_DM_delCols)]
 
                 # Keep columns
-                sb_DM_keepCols = st.multiselect("Select columns to keep", df.columns, key = st.session_state['key'])
+                sb_DM_keepCols = st.multiselect("Select columns to keep", df.columns, key = st.session_state['key'], on_change=in_wid_change)
                 if len(sb_DM_keepCols) > 0:
                     df = df.loc[:,df.columns.isin(sb_DM_keepCols)]
 
                 # Delete duplicates if any exist
                 if df[df.duplicated()].shape[0] > 0:
-                    sb_DM_delDup = st.selectbox("Delete duplicate rows ", ["No", "Yes"], key = st.session_state['key'])
+                    sb_DM_delDup = st.selectbox("Delete duplicate rows ", ["No", "Yes"], key = st.session_state['key'], on_change=in_wid_change)
                     if sb_DM_delDup == "Yes":
                         n_rows_dup = df[df.duplicated()].shape[0]
                         df = df.drop_duplicates()
@@ -472,7 +501,7 @@ def app():
                 # Delete rows with NA if any exist
                 n_rows_wNAs = df.iloc[list(pd.unique(np.where(df.isnull())[0]))].shape[0]
                 if n_rows_wNAs > 0:
-                    sb_DM_delRows_wNA = st.selectbox("Delete rows with NAs ", ["No", "Yes"], key = st.session_state['key'])
+                    sb_DM_delRows_wNA = st.selectbox("Delete rows with NAs ", ["No", "Yes"], key = st.session_state['key'], on_change=in_wid_change)
                     if sb_DM_delRows_wNA == "Yes": 
                         df = df.dropna()
                 elif n_rows_wNAs == 0: 
@@ -480,7 +509,7 @@ def app():
 
                 # Filter data
                 st.markdown("**Data filtering**")
-                filter_var = st.selectbox('Filter your data by a variable...', list('-')+ list(df.columns), key = st.session_state['key'])
+                filter_var = st.selectbox('Filter your data by a variable...', list('-')+ list(df.columns), key = st.session_state['key'], on_change=in_wid_change)
                 if filter_var !='-':
                     
                     if df[filter_var].dtypes=="int64" or df[filter_var].dtypes=="float64": 
@@ -489,11 +518,11 @@ def app():
                         else:
                             filter_format=None
 
-                        user_filter=st.selectbox('Select values that are ...', options=['greater','greater or equal','smaller','smaller or equal', 'equal','between'], key = st.session_state['key'])
+                        user_filter=st.selectbox('Select values that are ...', options=['greater','greater or equal','smaller','smaller or equal', 'equal','between'], key = st.session_state['key'], on_change=in_wid_change)
                                                 
                         if user_filter=='between':
-                            filter_1=st.number_input('Lower limit is', format=filter_format, value=df[filter_var].min(), min_value=df[filter_var].min(), max_value=df[filter_var].max(), key = st.session_state['key'])
-                            filter_2=st.number_input('Upper limit is', format=filter_format, value=df[filter_var].max(), min_value=df[filter_var].min(), max_value=df[filter_var].max(), key = st.session_state['key'])
+                            filter_1=st.number_input('Lower limit is', format=filter_format, value=df[filter_var].min(), min_value=df[filter_var].min(), max_value=df[filter_var].max(), key = st.session_state['key'], on_change=in_wid_change)
+                            filter_2=st.number_input('Upper limit is', format=filter_format, value=df[filter_var].max(), min_value=df[filter_var].min(), max_value=df[filter_var].max(), key = st.session_state['key'], on_change=in_wid_change)
                             #reclassify values:
                             if filter_1 < filter_2 :
                                 df = df[(df[filter_var] > filter_1) & (df[filter_var] < filter_2)] 
@@ -504,12 +533,12 @@ def app():
                                 st.error("ERROR: Lower limit must be smaller than upper limit!")  
                                 return                    
                         elif user_filter=='equal':                            
-                            filter_1=st.multiselect('to... ', options=df[filter_var].values, key = st.session_state['key'])
+                            filter_1=st.multiselect('to... ', options=df[filter_var].values, key = st.session_state['key'], on_change=in_wid_change)
                             if len(filter_1)>0:
                                 df = df.loc[df[filter_var].isin(filter_1)]
 
                         else:
-                            filter_1=st.number_input('than... ',format=filter_format, value=df[filter_var].min(), min_value=df[filter_var].min(), max_value=df[filter_var].max(), key = st.session_state['key'])
+                            filter_1=st.number_input('than... ',format=filter_format, value=df[filter_var].min(), min_value=df[filter_var].min(), max_value=df[filter_var].max(), key = st.session_state['key'], on_change=in_wid_change)
                             #reclassify values:
                             if user_filter=='greater':
                                 df = df[df[filter_var] > filter_1]
@@ -526,7 +555,7 @@ def app():
                             elif len(df) == n_rows:
                                 st.warning("WARNING: Data are not filtered for this value!")         
                     else:                  
-                        filter_1=st.multiselect('Filter your data by a value...', (df[filter_var]).unique(), key = st.session_state['key'])
+                        filter_1=st.multiselect('Filter your data by a value...', (df[filter_var]).unique(), key = st.session_state['key'], on_change=in_wid_change)
                         if len(filter_1)>0:
                             df = df.loc[df[filter_var].isin(filter_1)]
                 
@@ -538,12 +567,12 @@ def app():
                     # Select data imputation method (only if rows with NA not deleted)
                     if sb_DM_delRows_wNA == "No" and n_rows_wNAs > 0:
                         st.markdown("**Data imputation**")
-                        sb_DM_dImp_choice = st.selectbox("Replace entries with NA ", ["No", "Yes"], key = st.session_state['key'])
+                        sb_DM_dImp_choice = st.selectbox("Replace entries with NA ", ["No", "Yes"], key = st.session_state['key'], on_change=in_wid_change)
                         if sb_DM_dImp_choice == "Yes":
                             # Numeric variables
-                            sb_DM_dImp_num = st.selectbox("Imputation method for numeric variables ", ["Mean", "Median", "Random value"], key = st.session_state['key'])
+                            sb_DM_dImp_num = st.selectbox("Imputation method for numeric variables ", ["Mean", "Median", "Random value"], key = st.session_state['key'], on_change=in_wid_change)
                             # Other variables
-                            sb_DM_dImp_other = st.selectbox("Imputation method for other variables ", ["Mode", "Random value"], key = st.session_state['key'])
+                            sb_DM_dImp_other = st.selectbox("Imputation method for other variables ", ["Mode", "Random value"], key = st.session_state['key'], on_change=in_wid_change)
                             df = fc.data_impute(df, sb_DM_dImp_num, sb_DM_dImp_other)
                     else:
                         st.markdown("**Data imputation**")
@@ -558,28 +587,28 @@ def app():
                 # Select columns for different transformation types
                 transform_options = df.select_dtypes([np.number]).columns
                 numCat_options = df.columns
-                sb_DM_dTrans_log = st.multiselect("Select columns to transform with log ", transform_options, key = st.session_state['key'])
+                sb_DM_dTrans_log = st.multiselect("Select columns to transform with log ", transform_options, key = st.session_state['key'], on_change=in_wid_change)
                 if sb_DM_dTrans_log is not None: 
                     df = fc.var_transform_log(df, sb_DM_dTrans_log)
-                sb_DM_dTrans_sqrt = st.multiselect("Select columns to transform with sqrt ", transform_options, key = st.session_state['key'])
+                sb_DM_dTrans_sqrt = st.multiselect("Select columns to transform with sqrt ", transform_options, key = st.session_state['key'], on_change=in_wid_change)
                 if sb_DM_dTrans_sqrt is not None: 
                     df = fc.var_transform_sqrt(df, sb_DM_dTrans_sqrt)
-                sb_DM_dTrans_square = st.multiselect("Select columns for squaring ", transform_options, key = st.session_state['key'])
+                sb_DM_dTrans_square = st.multiselect("Select columns for squaring ", transform_options, key = st.session_state['key'], on_change=in_wid_change)
                 if sb_DM_dTrans_square is not None: 
                     df = fc.var_transform_square(df, sb_DM_dTrans_square)
-                sb_DM_dTrans_cent = st.multiselect("Select columns for centering ", transform_options, key = st.session_state['key'])
+                sb_DM_dTrans_cent = st.multiselect("Select columns for centering ", transform_options, key = st.session_state['key'], on_change=in_wid_change)
                 if sb_DM_dTrans_cent is not None: 
                     df = fc.var_transform_cent(df, sb_DM_dTrans_cent)
-                sb_DM_dTrans_stand = st.multiselect("Select columns for standardization ", transform_options, key = st.session_state['key'])
+                sb_DM_dTrans_stand = st.multiselect("Select columns for standardization ", transform_options, key = st.session_state['key'], on_change=in_wid_change)
                 if sb_DM_dTrans_stand is not None: 
                     df = fc.var_transform_stand(df, sb_DM_dTrans_stand)
-                sb_DM_dTrans_norm = st.multiselect("Select columns for normalization ", transform_options, key = st.session_state['key'])
+                sb_DM_dTrans_norm = st.multiselect("Select columns for normalization ", transform_options, key = st.session_state['key'], on_change=in_wid_change)
                 if sb_DM_dTrans_norm is not None: 
                     df = fc.var_transform_norm(df, sb_DM_dTrans_norm)
-                sb_DM_dTrans_numCat = st.multiselect("Select columns for numeric categorization ", numCat_options, key = st.session_state['key'])
+                sb_DM_dTrans_numCat = st.multiselect("Select columns for numeric categorization ", numCat_options, key = st.session_state['key'], on_change=in_wid_change)
                 if sb_DM_dTrans_numCat:
                     if not df[sb_DM_dTrans_numCat].columns[df[sb_DM_dTrans_numCat].isna().any()].tolist(): 
-                        sb_DM_dTrans_numCat_sel = st.multiselect("Select variables for manual categorization ", sb_DM_dTrans_numCat, key = st.session_state['key'])
+                        sb_DM_dTrans_numCat_sel = st.multiselect("Select variables for manual categorization ", sb_DM_dTrans_numCat, key = st.session_state['key'], on_change=in_wid_change)
                         if sb_DM_dTrans_numCat_sel:
                             for var in sb_DM_dTrans_numCat_sel:
                                 if df[var].unique().size > 5: 
@@ -591,7 +620,7 @@ def app():
                                     # Save manually selected categories
                                     for i in range(0, df[var].unique().size):
                                         text1 = text + str(var) + ": " + str(sorted(df[var].unique())[i])
-                                        man_cat = st.number_input(text1, value = 0, min_value=0, key = st.session_state['key'])
+                                        man_cat = st.number_input(text1, value = 0, min_value=0, key = st.session_state['key'], on_change=in_wid_change)
                                         manual_cats.loc[i]["Value"] = sorted(df[var].unique())[i]
                                         manual_cats.loc[i]["Cat"] = man_cat
                                     
@@ -614,27 +643,27 @@ def app():
                         return
                 else:
                     sb_DM_dTrans_numCat = None
-                sb_DM_dTrans_mult = st.number_input("Number of variable multiplications ", value = 0, min_value=0, key = st.session_state['key'])
+                sb_DM_dTrans_mult = st.number_input("Number of variable multiplications ", value = 0, min_value=0, key = st.session_state['key'], on_change=in_wid_change)
                 if sb_DM_dTrans_mult != 0: 
                     multiplication_pairs = pd.DataFrame(index = range(0, sb_DM_dTrans_mult), columns=["Var1", "Var2"])
                     text = "Multiplication pair"
                     for i in range(0, sb_DM_dTrans_mult):
                         text1 = text + " " + str(i+1)
                         text2 = text + " " + str(i+1) + " "
-                        mult_var1 = st.selectbox(text1, transform_options, key = st.session_state['key'])
-                        mult_var2 = st.selectbox(text2, transform_options, key = st.session_state['key'])
+                        mult_var1 = st.selectbox(text1, transform_options, key = st.session_state['key'], on_change=in_wid_change)
+                        mult_var2 = st.selectbox(text2, transform_options, key = st.session_state['key'], on_change=in_wid_change)
                         multiplication_pairs.loc[i]["Var1"] = mult_var1
                         multiplication_pairs.loc[i]["Var2"] = mult_var2
                         fc.var_transform_mult(df, mult_var1, mult_var2)
-                sb_DM_dTrans_div = st.number_input("Number of variable divisions ", value = 0, min_value=0, key = st.session_state['key'])
+                sb_DM_dTrans_div = st.number_input("Number of variable divisions ", value = 0, min_value=0, key = st.session_state['key'], on_change=in_wid_change)
                 if sb_DM_dTrans_div != 0:
                     division_pairs = pd.DataFrame(index = range(0, sb_DM_dTrans_div), columns=["Var1", "Var2"]) 
                     text = "Division pair"
                     for i in range(0, sb_DM_dTrans_div):
                         text1 = text + " " + str(i+1) + " (numerator)"
                         text2 = text + " " + str(i+1) + " (denominator)"
-                        div_var1 = st.selectbox(text1, transform_options, key = st.session_state['key'])
-                        div_var2 = st.selectbox(text2, transform_options, key = st.session_state['key'])
+                        div_var1 = st.selectbox(text1, transform_options, key = st.session_state['key'], on_change=in_wid_change)
+                        div_var2 = st.selectbox(text2, transform_options, key = st.session_state['key'], on_change=in_wid_change)
                         division_pairs.loc[i]["Var1"] = div_var1
                         division_pairs.loc[i]["Var2"] = div_var2
                         fc.var_transform_div(df, div_var1, div_var2)
@@ -1059,7 +1088,7 @@ def app():
                     
                     # Response variable
                     response_var_options = df.columns
-                    response_var = st.selectbox("Select response variable", response_var_options, key = st.session_state['key'])
+                    response_var = st.selectbox("Select response variable", response_var_options, key = st.session_state['key'], on_change=in_wid_change)
                     
                     # Check if response variable is numeric and has no NAs
                     response_var_message_num = False
@@ -1083,7 +1112,7 @@ def app():
                         # Select explanatory variables
                         expl_var_options = df.columns
                         expl_var_options = expl_var_options[expl_var_options.isin(df.drop(response_var, axis = 1).columns)]
-                        expl_var = st.multiselect("Select explanatory variables", expl_var_options, key = st.session_state['key'])
+                        expl_var = st.multiselect("Select explanatory variables", expl_var_options, key = st.session_state['key'], on_change=in_wid_change)
                         var_list = list([response_var]) + list(expl_var)
 
                         # Check if explanatory variables are numeric
@@ -1125,7 +1154,7 @@ def app():
                                 response_var_type = "continuous"
 
                             alg_list = list(algorithms)
-                            sb_ML_alg = st.multiselect("Select modelling techniques", alg_list, alg_list)
+                            sb_ML_alg = st.multiselect("Select modelling techniques", alg_list, alg_list, on_change=in_wid_change)
                             
                             # MLR + binary info message
                             if any(a for a in sb_ML_alg if a == "Multiple Linear Regression") and response_var_type == "binary":
@@ -1139,12 +1168,12 @@ def app():
                                 MLR_cov_type = "non-robust"
                                 MLR_finalPara["intercept"] = MLR_intercept
                                 MLR_finalPara["covType"] = MLR_cov_type
-                                if st.checkbox("Adjust settings for Multiple Linear Regression"):
+                                if st.checkbox("Adjust settings for Multiple Linear Regression", on_change=in_wid_change):
                                     col1, col2 = st.columns(2)
                                     with col1:
-                                        MLR_intercept = st.selectbox("Include intercept", ["Yes", "No"])
+                                        MLR_intercept = st.selectbox("Include intercept", ["Yes", "No"], on_change=in_wid_change)
                                     with col2:
-                                        MLR_cov_type = st.selectbox("Covariance type", ["non-robust", "HC0", "HC1", "HC2", "HC3"])
+                                        MLR_cov_type = st.selectbox("Covariance type", ["non-robust", "HC0", "HC1", "HC2", "HC3"], on_change=in_wid_change)
                                     MLR_finalPara["intercept"] = MLR_intercept
                                     MLR_finalPara["covType"] = MLR_cov_type
                                     st.write("") 
@@ -1156,12 +1185,12 @@ def app():
                                 LR_cov_type = "non-robust"
                                 LR_finalPara["intercept"] = LR_intercept
                                 LR_finalPara["covType"] = LR_cov_type
-                                if st.checkbox("Adjust settings for Logistic Regression"):
+                                if st.checkbox("Adjust settings for Logistic Regression", on_change=in_wid_change):
                                     col1, col2 = st.columns(2)
                                     with col1:
-                                        LR_intercept = st.selectbox("Include intercept   ", ["Yes", "No"])
+                                        LR_intercept = st.selectbox("Include intercept   ", ["Yes", "No"], on_change=in_wid_change)
                                     with col2:
-                                        LR_cov_type = st.selectbox("Covariance type", ["non-robust", "HC0"])
+                                        LR_cov_type = st.selectbox("Covariance type", ["non-robust", "HC0"], on_change=in_wid_change)
                                     LR_finalPara["intercept"] = LR_intercept
                                     LR_finalPara["covType"] = LR_cov_type
                                     st.write("") 
@@ -1174,22 +1203,22 @@ def app():
                                 gam_finalPara["spline order"] = 3
                                 gam_finalPara["lambda"] = 0.6
                                 gam_lam_search = "No"
-                                if st.checkbox("Adjust settings for Generalized Additive Models"):
+                                if st.checkbox("Adjust settings for Generalized Additive Models", on_change=in_wid_change):
                                     gam_finalPara = pd.DataFrame(index = ["value"], columns = ["intercept", "number of splines", "spline order", "lambda"])
                                     col1, col2 = st.columns(2)
                                     with col1:
-                                        gam_intercept = st.selectbox("Include intercept ", ["Yes", "No"])
+                                        gam_intercept = st.selectbox("Include intercept ", ["Yes", "No"], on_change=in_wid_change)
                                     gam_finalPara["intercept"] = gam_intercept
                                     with col2:
-                                        gam_lam_search = st.selectbox("Search for lambda ", ["No", "Yes"])
+                                        gam_lam_search = st.selectbox("Search for lambda ", ["No", "Yes"], on_change=in_wid_change)
                                     if gam_lam_search == "Yes":
                                         ls_col1, ls_col2, ls_col3 = st.columns(3)
                                         with ls_col1:
-                                            ls_min = st.number_input("Minimum lambda value", value=0.001, step=1e-3, min_value=0.001, format="%.3f") 
+                                            ls_min = st.number_input("Minimum lambda value", value=0.001, step=1e-3, min_value=0.001, format="%.3f", on_change=in_wid_change) 
                                         with ls_col2:
-                                            ls_max = st.number_input("Maximum lambda value", value=100.000, step=1e-3, min_value=0.002, format="%.3f")
+                                            ls_max = st.number_input("Maximum lambda value", value=100.000, step=1e-3, min_value=0.002, format="%.3f", on_change=in_wid_change)
                                         with ls_col3:
-                                            ls_number = st.number_input("Lambda values per variable", value=50, min_value=2)
+                                            ls_number = st.number_input("Lambda values per variable", value=50, min_value=2, on_change=in_wid_change)
                                         if ls_number**len(expl_var) > 10000:
                                             st.warning("WARNING: Your grid has " + str(ls_number**len(expl_var)) + " combinations. Please note that searching for lambda will take a lot of time!")
                                         else:
@@ -1204,14 +1233,14 @@ def app():
                                     for gset in range(0,len(expl_var)):
                                         var_name = expl_var[gset]
                                         with gam_col1:
-                                            nos = st.number_input("Number of splines (" + var_name + ")", value = 20, min_value=1) 
+                                            nos = st.number_input("Number of splines (" + var_name + ")", value = 20, min_value=1, on_change=in_wid_change) 
                                             gam_nos_values.append(nos)
                                         with gam_col2:
-                                            so = st.number_input("Spline order (" + var_name + ")", value = 3, min_value=3) 
+                                            so = st.number_input("Spline order (" + var_name + ")", value = 3, min_value=3, on_change=in_wid_change) 
                                             gam_so_values.append(so)
                                         if gam_lam_search == "No":
                                             with gam_col3: 
-                                                lam = st.number_input("Lambda (" + var_name + ")", value = 0.6, min_value=0.001, step=1e-3, format="%.3f") 
+                                                lam = st.number_input("Lambda (" + var_name + ")", value = 0.6, min_value=0.001, step=1e-3, format="%.3f", on_change=in_wid_change) 
                                                 gam_lam_values.append(lam) 
                                         if nos <= so:
                                             st.error("ERROR: Please make sure that the number of splines is greater than the spline order for "+ str(expl_var[gset]) + "!")
@@ -1239,25 +1268,25 @@ def app():
                                 rf_finalPara["maximum number of features"] = [len(expl_var)]
                                 rf_finalPara["sample rate"] = [0.99]
                                 final_hyPara_values["rf"] = rf_finalPara
-                                if st.checkbox("Adjust settings for Random Forest "):  
+                                if st.checkbox("Adjust settings for Random Forest ", on_change=in_wid_change):  
                                     col1, col2 = st.columns(2)
                                     col3, col4 = st.columns(2)
                                     with col1:
-                                        rf_finalPara["number of trees"] = st.number_input("Number of trees", value=100, step=1, min_value=1) 
+                                        rf_finalPara["number of trees"] = st.number_input("Number of trees", value=100, step=1, min_value=1, on_change=in_wid_change) 
                                     with col3:
                                         rf_mtd_sel = st.selectbox("Specify maximum tree depth ", ["No", "Yes"])
                                         if rf_mtd_sel == "No":
                                             rf_finalPara["maximum tree depth"] = [None]
                                         if rf_mtd_sel == "Yes":
-                                            rf_finalPara["maximum tree depth"] = st.slider("Maximum tree depth ", value=20, step=1, min_value=1, max_value=50)
+                                            rf_finalPara["maximum tree depth"] = st.slider("Maximum tree depth ", value=20, step=1, min_value=1, max_value=50, on_change=in_wid_change)
                                     if len(expl_var) >1:
                                         with col4:
-                                            rf_finalPara["maximum number of features"] = st.slider("Maximum number of features ", value=len(expl_var), step=1, min_value=1, max_value=len(expl_var))
+                                            rf_finalPara["maximum number of features"] = st.slider("Maximum number of features ", value=len(expl_var), step=1, min_value=1, max_value=len(expl_var), on_change=in_wid_change)
                                         with col2:
-                                            rf_finalPara["sample rate"] = st.slider("Sample rate ", value=0.99, step=0.01, min_value=0.5, max_value=0.99)
+                                            rf_finalPara["sample rate"] = st.slider("Sample rate ", value=0.99, step=0.01, min_value=0.5, max_value=0.99, on_change=in_wid_change)
                                     else:
                                         with col2:
-                                            rf_finalPara["sample rate"] = st.slider("Sample rate ", value=0.99, step=0.01, min_value=0.5, max_value=0.99)
+                                            rf_finalPara["sample rate"] = st.slider("Sample rate ", value=0.99, step=0.01, min_value=0.5, max_value=0.99, on_change=in_wid_change)
                                     final_hyPara_values["rf"] = rf_finalPara 
                                     st.write("") 
 
@@ -1269,17 +1298,17 @@ def app():
                                 brt_finalPara["maximum tree depth"] = [3]
                                 brt_finalPara["sample rate"] = [1]
                                 final_hyPara_values["brt"] = brt_finalPara
-                                if st.checkbox("Adjust settings for Boosted Regression Trees "):
+                                if st.checkbox("Adjust settings for Boosted Regression Trees ", on_change=in_wid_change):
                                     col1, col2 = st.columns(2)
                                     col3, col4 = st.columns(2)
                                     with col1:
-                                        brt_finalPara["number of trees"] = st.number_input("Number of trees ", value=100, step=1, min_value=1) 
+                                        brt_finalPara["number of trees"] = st.number_input("Number of trees ", value=100, step=1, min_value=1, on_change=in_wid_change) 
                                     with col2:
-                                        brt_finalPara["learning rate"] = st.slider("Learning rate ", value=0.1, min_value=0.001, max_value=0.1 , step=1e-3, format="%.3f")
+                                        brt_finalPara["learning rate"] = st.slider("Learning rate ", value=0.1, min_value=0.001, max_value=0.1 , step=1e-3, format="%.3f", on_change=in_wid_change)
                                     with col3:
-                                        brt_finalPara["maximum tree depth"] = st.slider("Maximum tree depth ", value=3, step=1, min_value=1, max_value=30)
+                                        brt_finalPara["maximum tree depth"] = st.slider("Maximum tree depth ", value=3, step=1, min_value=1, max_value=30, on_change=in_wid_change)
                                     with col4:
-                                        brt_finalPara["sample rate"] = st.slider("Sample rate ", value=1.0, step=0.01, min_value=0.5, max_value=1.0)
+                                        brt_finalPara["sample rate"] = st.slider("Sample rate ", value=1.0, step=0.01, min_value=0.5, max_value=1.0, on_change=in_wid_change)
                                     final_hyPara_values["brt"] = brt_finalPara
                                     st.write("")  
 
@@ -1293,34 +1322,34 @@ def app():
                                 ann_finalPara["learning rate"] = [0.001]
                                 ann_finalPara["L² regularization"] = [0.0001]
                                 final_hyPara_values["ann"] = ann_finalPara
-                                if st.checkbox("Adjust settings for Artificial Neural Networks "): 
+                                if st.checkbox("Adjust settings for Artificial Neural Networks ", on_change=in_wid_change): 
                                     col1, col2 = st.columns(2)
                                     col3, col4 = st.columns(2)
                                     col5, col6 = st.columns(2)
                                     with col1:
-                                        ann_finalPara["weight optimization solver"] = st.selectbox("Weight optimization solver ", ["adam"])
+                                        ann_finalPara["weight optimization solver"] = st.selectbox("Weight optimization solver ", ["adam"], on_change=in_wid_change)
                                     with col2:
-                                        ann_finalPara["activation function"] = st.selectbox("Activation function ", ["relu", "identity", "logistic", "tanh"])
+                                        ann_finalPara["activation function"] = st.selectbox("Activation function ", ["relu", "identity", "logistic", "tanh"], on_change=in_wid_change)
                                     with col3:
-                                        ann_finalPara["maximum number of iterations"] = st.slider("Maximum number of iterations ", value=200, step=1, min_value=10, max_value=1000) 
+                                        ann_finalPara["maximum number of iterations"] = st.slider("Maximum number of iterations ", value=200, step=1, min_value=10, max_value=1000, on_change=in_wid_change) 
                                     with col4:
-                                        ann_finalPara["learning rate"] = st.slider("Learning rate  ", min_value=0.0001, max_value=0.01, value=0.001, step=1e-4, format="%.4f")
+                                        ann_finalPara["learning rate"] = st.slider("Learning rate  ", min_value=0.0001, max_value=0.01, value=0.001, step=1e-4, format="%.4f", on_change=in_wid_change)
                                     with col5:
-                                        number_hidden_layers = st.selectbox("Number of hidden layers", [1, 2, 3])
+                                        number_hidden_layers = st.selectbox("Number of hidden layers", [1, 2, 3], on_change=in_wid_change)
                                         if number_hidden_layers == 1:
-                                            number_nodes1 = st.slider("Number of nodes in hidden layer", 5, 500, 100)
+                                            number_nodes1 = st.slider("Number of nodes in hidden layer", 5, 500, 100, on_change=in_wid_change)
                                             ann_finalPara["hidden layer sizes"] = [(number_nodes1,)]
                                         if number_hidden_layers == 2:
-                                            number_nodes1 = st.slider("Number of neurons in first hidden layer", 5, 500, 100)
-                                            number_nodes2 = st.slider("Number of neurons in second hidden layer", 5, 500, 100)
+                                            number_nodes1 = st.slider("Number of neurons in first hidden layer", 5, 500, 100, on_change=in_wid_change)
+                                            number_nodes2 = st.slider("Number of neurons in second hidden layer", 5, 500, 100, on_change=in_wid_change)
                                             ann_finalPara["hidden layer sizes"] = [(number_nodes1,number_nodes2,)]
                                         if number_hidden_layers == 3:
-                                            number_nodes1 = st.slider("Number of neurons in first hidden layer", 5, 500, 100)
-                                            number_nodes2 = st.slider("Number of neurons in second hidden layer", 5, 500, 100)
-                                            number_nodes3 = st.slider("Number of neurons in third hidden layer", 5, 500, 100)
+                                            number_nodes1 = st.slider("Number of neurons in first hidden layer", 5, 500, 100, on_change=in_wid_change)
+                                            number_nodes2 = st.slider("Number of neurons in second hidden layer", 5, 500, 100, on_change=in_wid_change)
+                                            number_nodes3 = st.slider("Number of neurons in third hidden layer", 5, 500, 100, on_change=in_wid_change)
                                             ann_finalPara["hidden layer sizes"] = [(number_nodes1,number_nodes2,number_nodes3,)]
                                     with col6:
-                                        ann_finalPara["L² regularization"] = st.slider("L² regularization  ", min_value=0.00001, max_value=0.001, value=0.0001, step=1e-5, format="%.5f")                                
+                                        ann_finalPara["L² regularization"] = st.slider("L² regularization  ", min_value=0.00001, max_value=0.001, value=0.0001, step=1e-5, format="%.5f", on_change=in_wid_change)                                
 
                             #--------------------------------------------------------------------------------------
                             # HYPERPARAMETER TUNING SETTINGS
@@ -1331,7 +1360,7 @@ def app():
                                 if any(a for a in sb_ML_alg if a == "Random Forest") or any(a for a in sb_ML_alg if a == "Boosted Regression Trees") or any(a for a in sb_ML_alg if a == "Artificial Neural Networks"):
                                     # General settings
                                     st.markdown("**Hyperparameter-tuning settings**")
-                                    do_hypTune = st.selectbox("Use hyperparameter-tuning", ["No", "Yes"])
+                                    do_hypTune = st.selectbox("Use hyperparameter-tuning", ["No", "Yes"], on_change=in_wid_change)
                                 
                                     # Save hyperparameter values for all algorithms
                                     hyPara_values = {}
@@ -1345,14 +1374,14 @@ def app():
                                         st.warning("WARNING: Hyperparameter-tuning can take a lot of time! For tips, please [contact us](mailto:staty@quant-works.de?subject=Staty-App).")
                                         
                                         # Further general settings
-                                        hypTune_method = st.selectbox("Hyperparameter-search method", ["random grid-search", "grid-search", "Bayes optimization", "sequential model-based optimization"])
+                                        hypTune_method = st.selectbox("Hyperparameter-search method", ["random grid-search", "grid-search", "Bayes optimization", "sequential model-based optimization"], on_change=in_wid_change)
                                         col1, col2 = st.columns(2)
                                         with col1:
-                                            hypTune_nCV = st.slider("Select number for n-fold cross-validation", 2, 10, 5)
+                                            hypTune_nCV = st.slider("Select number for n-fold cross-validation", 2, 10, 5, on_change=in_wid_change)
 
                                         if hypTune_method == "random grid-search" or hypTune_method == "Bayes optimization" or hypTune_method == "sequential model-based optimization":
                                             with col2:
-                                                hypTune_iter = st.slider("Select number of iterations for search", 20, 1000, 20)
+                                                hypTune_iter = st.slider("Select number of iterations for search", 20, 1000, 20, on_change=in_wid_change)
                                         else:
                                             hypTune_iter = False
 
@@ -1365,24 +1394,24 @@ def app():
                                             rf_tunePara["maximum number of features"] = [1, len(expl_var)]
                                             rf_tunePara["sample rate"] = [0.8, 0.99]
                                             hyPara_values["rf"] = rf_tunePara
-                                            if st.checkbox("Adjust tuning settings for Random Forest"):
+                                            if st.checkbox("Adjust tuning settings for Random Forest", on_change=in_wid_change):
                                                 col1, col2 = st.columns(2)
                                                 col3, col4 = st.columns(2)
                                                 with col1:
-                                                    rf_tunePara["number of trees"] = st.slider("Range for number of trees ", 50, 1000, [50, 500])
+                                                    rf_tunePara["number of trees"] = st.slider("Range for number of trees ", 50, 1000, [50, 500], on_change=in_wid_change)
                                                 with col3:
-                                                    rf_mtd_choice = st.selectbox("Specify maximum tree depth", ["No", "Yes"])
+                                                    rf_mtd_choice = st.selectbox("Specify maximum tree depth", ["No", "Yes"], on_change=in_wid_change)
                                                     if rf_mtd_choice == "Yes":
-                                                        rf_tunePara["maximum tree depth"] = st.slider("Range for maximum tree depth ", 1, 50, [2, 10])
+                                                        rf_tunePara["maximum tree depth"] = st.slider("Range for maximum tree depth ", 1, 50, [2, 10], on_change=in_wid_change)
                                                     else:
                                                         rf_tunePara["maximum tree depth"] = [None, None]
                                                 with col4:
                                                     if len(expl_var) > 1:
-                                                        rf_tunePara["maximum number of features"] = st.slider("Range for maximum number of features", 1, len(expl_var), [1, len(expl_var)])
+                                                        rf_tunePara["maximum number of features"] = st.slider("Range for maximum number of features", 1, len(expl_var), [1, len(expl_var)], on_change=in_wid_change)
                                                     else:
                                                         rf_tunePara["maximum number of features"] = [1,1]
                                                 with col2:
-                                                    rf_tunePara["sample rate"] = st.slider("Range for sample rate ", 0.5, 0.99, [0.8, 0.99])
+                                                    rf_tunePara["sample rate"] = st.slider("Range for sample rate ", 0.5, 0.99, [0.8, 0.99], on_change=in_wid_change)
                                                 hyPara_values["rf"] = rf_tunePara
 
                                         # Boosted Regression Trees settings
@@ -1393,17 +1422,17 @@ def app():
                                             brt_tunePara["maximum tree depth"] = [2, 10]
                                             brt_tunePara["sample rate"] = [0.8, 1.0]
                                             hyPara_values["brt"] = brt_tunePara
-                                            if st.checkbox("Adjust tuning settings for Boosted Regression Trees"):
+                                            if st.checkbox("Adjust tuning settings for Boosted Regression Trees", on_change=in_wid_change):
                                                 col1, col2 = st.columns(2)
                                                 col3, col4 = st.columns(2)
                                                 with col1:
-                                                    brt_tunePara["number of trees"] = st.slider("Range for number of trees", 50, 1000, [50, 500])
+                                                    brt_tunePara["number of trees"] = st.slider("Range for number of trees", 50, 1000, [50, 500], on_change=in_wid_change)
                                                 with col2:
-                                                    brt_tunePara["learning rate"] = st.slider("Range for learning rate", 0.001, 0.1, [0.001, 0.02], step=1e-3, format="%.3f") 
+                                                    brt_tunePara["learning rate"] = st.slider("Range for learning rate", 0.001, 0.1, [0.001, 0.02], step=1e-3, format="%.3f", on_change=in_wid_change) 
                                                 with col3:
-                                                    brt_tunePara["maximum tree depth"] = st.slider("Range for maximum tree depth", 1, 30, [2, 10])
+                                                    brt_tunePara["maximum tree depth"] = st.slider("Range for maximum tree depth", 1, 30, [2, 10], on_change=in_wid_change)
                                                 with col4:
-                                                    brt_tunePara["sample rate"] = st.slider("Range for sample rate", 0.5, 1.0, [0.8, 1.0])
+                                                    brt_tunePara["sample rate"] = st.slider("Range for sample rate", 0.5, 1.0, [0.8, 1.0], on_change=in_wid_change)
                                                 hyPara_values["brt"] = brt_tunePara
 
                                         # Artificial Neural Networks settings
@@ -1417,75 +1446,75 @@ def app():
                                             ann_tunePara["learning rate"] = [0.0001, 0.002]
                                             ann_tunePara["L² regularization"] = [0.00001, 0.0002]
                                             hyPara_values["ann"] = ann_tunePara
-                                            if st.checkbox("Adjust tuning settings for Artificial Neural Networks"):
+                                            if st.checkbox("Adjust tuning settings for Artificial Neural Networks", on_change=in_wid_change):
                                                 col1, col2 = st.columns(2)
                                                 col3, col4 = st.columns(2)
                                                 col5, col6 = st.columns(2)
                                                 with col1:
-                                                    weight_opt_list = st.selectbox("Weight optimization solver  ", ["adam"])
+                                                    weight_opt_list = st.selectbox("Weight optimization solver  ", ["adam"], on_change=in_wid_change)
                                                     if len(weight_opt_list) == 0:
                                                         weight_opt_list = ["adam"]
                                                         st.warning("WARNING: Default value used 'adam'")
                                                     ann_tunePara["weight optimization solver"] = list([[weight_opt_list], "NA"])
                                                 with col2:
-                                                    ann_tunePara["maximum number of iterations"] = st.slider("Maximum number of iterations (epochs) ", 10, 1000, [100, 200])
+                                                    ann_tunePara["maximum number of iterations"] = st.slider("Maximum number of iterations (epochs) ", 10, 1000, [100, 200], on_change=in_wid_change)
                                                 with col3:
-                                                    act_func_list = st.multiselect("Activation function ", ["identity", "logistic", "tanh", "relu"], ["relu"])
+                                                    act_func_list = st.multiselect("Activation function ", ["identity", "logistic", "tanh", "relu"], ["relu"], on_change=in_wid_change)
                                                     if len(act_func_list) == 0:
                                                         act_func_list = ["relu"]
                                                         st.warning("WARNING: Default value used 'relu'")
                                                     ann_tunePara["activation function"] = list([act_func_list, "NA"])
                                                 with col5:
-                                                    number_hidden_layers = st.selectbox("Number of hidden layers ", [1, 2, 3])
+                                                    number_hidden_layers = st.selectbox("Number of hidden layers ", [1, 2, 3], on_change=in_wid_change)
                                                     ann_tunePara["number of hidden layers"]  = list([number_hidden_layers, "NA"])
                                                     # Cases for hidden layers
                                                     if number_hidden_layers == 1:
-                                                        ann_tunePara["nodes per hidden layer"] = st.slider("Number of nodes in hidden layer ", 5, 500, [50, 100])
+                                                        ann_tunePara["nodes per hidden layer"] = st.slider("Number of nodes in hidden layer ", 5, 500, [50, 100], on_change=in_wid_change)
                                                     if number_hidden_layers == 2:
-                                                        number_nodes1 = st.slider("Number of neurons in first hidden layer ", 5, 500, [50, 100])
-                                                        number_nodes2 = st.slider("Number of neurons in second hidden layer ", 5, 500, [50, 100])
+                                                        number_nodes1 = st.slider("Number of neurons in first hidden layer ", 5, 500, [50, 100], on_change=in_wid_change)
+                                                        number_nodes2 = st.slider("Number of neurons in second hidden layer ", 5, 500, [50, 100], on_change=in_wid_change)
                                                         min_nodes = list([number_nodes1[0], number_nodes2[0]])
                                                         max_nodes = list([number_nodes1[1], number_nodes2[1]])
                                                         ann_tunePara["nodes per hidden layer"] = list([min_nodes, max_nodes])
                                                     if number_hidden_layers == 3:
-                                                        number_nodes1 = st.slider("Number of neurons in first hidden layer ", 5, 500, [50, 100])
-                                                        number_nodes2 = st.slider("Number of neurons in second hidden layer ", 5, 500, [50, 100])
-                                                        number_nodes3 = st.slider("Number of neurons in third hidden layer ", 5, 500, [50, 100])
+                                                        number_nodes1 = st.slider("Number of neurons in first hidden layer ", 5, 500, [50, 100], on_change=in_wid_change)
+                                                        number_nodes2 = st.slider("Number of neurons in second hidden layer ", 5, 500, [50, 100], on_change=in_wid_change)
+                                                        number_nodes3 = st.slider("Number of neurons in third hidden layer ", 5, 500, [50, 100], on_change=in_wid_change)
                                                         min_nodes = list([number_nodes1[0], number_nodes2[0], number_nodes3[0]])
                                                         max_nodes = list([number_nodes1[1], number_nodes2[1], number_nodes3[1]])
                                                         ann_tunePara["nodes per hidden layer"] = list([min_nodes, max_nodes])
                                                 with col6:
                                                     if weight_opt_list == "adam": 
-                                                        ann_tunePara["learning rate"] = st.slider("Range for learning rate ", 0.0001, 0.01, [0.0001, 0.002], step=1e-4, format="%.4f")
+                                                        ann_tunePara["learning rate"] = st.slider("Range for learning rate ", 0.0001, 0.01, [0.0001, 0.002], step=1e-4, format="%.4f", on_change=in_wid_change)
                                                 with col4:
-                                                    ann_tunePara["L² regularization"] = st.slider("L² regularization parameter ", 0.0, 0.001, [0.00001, 0.0002], step=1e-5, format="%.5f")
+                                                    ann_tunePara["L² regularization"] = st.slider("L² regularization parameter ", 0.0, 0.001, [0.00001, 0.0002], step=1e-5, format="%.5f", on_change=in_wid_change)
                                                 hyPara_values["ann"] = ann_tunePara
                                         
                                 #--------------------------------------------------------------------------------------
                                 # VALIDATION SETTINGS
 
                                 st.markdown("**Validation settings**")
-                                do_modval= st.selectbox("Use model validation", ["No", "Yes"])
+                                do_modval= st.selectbox("Use model validation", ["No", "Yes"], on_change=in_wid_change)
 
                                 if do_modval == "Yes":
                                     col1, col2 = st.columns(2)
                                     # Select training/ test ratio
                                     with col1: 
-                                        train_frac = st.slider("Select training data size", 0.5, 0.95, 0.8)
+                                        train_frac = st.slider("Select training data size", 0.5, 0.95, 0.8, on_change=in_wid_change)
 
                                     # Select number for validation runs
                                     with col2:
-                                        val_runs = st.slider("Select number for validation runs", 5, 100, 10)
+                                        val_runs = st.slider("Select number for validation runs", 5, 100, 10, on_change=in_wid_change)
 
                                 #--------------------------------------------------------------------------------------
                                 # PREDICTION SETTINGS
 
                                 st.markdown("**Model predictions**")
-                                do_modprednew = st.selectbox("Use model prediction for new data", ["No", "Yes"])
+                                do_modprednew = st.selectbox("Use model prediction for new data", ["No", "Yes"], on_change=in_wid_change)
 
                                 if do_modprednew == "Yes":
                                     # Upload new data
-                                    new_data_pred = st.file_uploader("  ", type=["csv", "txt"])
+                                    new_data_pred = st.file_uploader("  ", type=["csv", "txt"], on_change=in_wid_change)
 
                                     if new_data_pred is not None:
 
@@ -1948,20 +1977,44 @@ def app():
                                     # Full model (depending on prediction for new data)
                                     if do_modprednew == "Yes":
                                         if new_data_pred is not None:
-                                            model_full_results = ml.model_full(df, df_new, sb_ML_alg, MLR_model, MLR_finalPara, LR_finalPara, response_var_type, response_var, expl_var, final_hyPara_values, gam_finalPara)
+                                            if any(a for a in sb_ML_alg if a == "Artificial Neural Networks"):
+                                                model_full_results, full_model_ann_sk = ml.model_full(df, df_new, sb_ML_alg, MLR_model, MLR_finalPara, LR_finalPara, response_var_type, response_var, expl_var, final_hyPara_values, gam_finalPara)
+                                            else: 
+                                                model_full_results = ml.model_full(df, df_new, sb_ML_alg, MLR_model, MLR_finalPara, LR_finalPara, response_var_type, response_var, expl_var, final_hyPara_values, gam_finalPara)
                                     if do_modprednew == "No":
                                         df_new = pd.DataFrame()
-                                        model_full_results = ml.model_full(df, df_new, sb_ML_alg, MLR_model, MLR_finalPara, LR_finalPara, response_var_type, response_var, expl_var, final_hyPara_values, gam_finalPara)
-                                    
+                                        if any(a for a in sb_ML_alg if a == "Artificial Neural Networks"):
+                                            model_full_results, full_model_ann_sk = ml.model_full(df, df_new, sb_ML_alg, MLR_model, MLR_finalPara, LR_finalPara, response_var_type, response_var, expl_var, final_hyPara_values, gam_finalPara)
+                                        else:
+                                            model_full_results = ml.model_full(df, df_new, sb_ML_alg, MLR_model, MLR_finalPara, LR_finalPara, response_var_type, response_var, expl_var, final_hyPara_values, gam_finalPara)
                                     # Success message
                                     st.success('Models run successfully!')
+                                    if do_hypTune == "Yes":
+                                        st.session_state['model_tuning_results'] = model_tuning_results  
+                                    st.session_state['model_full_results'] = model_full_results
+                                    if do_modval == "Yes":  
+                                        st.session_state['model_val_results'] = model_val_results  
+                                    if any(a for a in sb_ML_alg if a == "Artificial Neural Networks"):
+                                        st.session_state['full_model_ann_sk'] = full_model_ann_sk
+                                        st.session_state['ann_finalPara'] = ann_finalPara
+                                        if do_hypTune == "Yes":
+                                            st.session_state['ann_tuning_results'] = ann_tuning_results                        
                 else: st.error("ERROR: No data available for Modelling!") 
 
         #++++++++++++++++++++++
         # ML OUTPUT
 
-        # Show only if models were run (no further widgets after run models or the full page reloads)
-        if run_models == True:
+        # Show only if models were run
+        if st.session_state['model_full_results'] is not None and 'expl_var' in locals():
+
+            model_tuning_results = st.session_state['model_tuning_results']
+            model_full_results = st.session_state['model_full_results']
+            model_val_results = st.session_state['model_val_results']
+
+            if any(a for a in sb_ML_alg if a == "Artificial Neural Networks"):
+                full_model_ann_sk = st.session_state['full_model_ann_sk']
+                ann_finalPara = st.session_state['ann_finalPara']
+                ann_tuning_results = st.session_state['ann_tuning_results']
             st.write("")
             st.write("")
             st.header("**Model outputs**")
@@ -2660,6 +2713,106 @@ def app():
                                 st.table(ann_error_est.style.set_precision(user_precision))
                             if sett_hints:
                                 st.info(str(fc.learning_hints("mod_md_ANN_regStat")))
+                            st.write("")
+                            # ANN architecture
+                            st.write("Artificial Neural Network architecture:")
+                            coef_list = full_model_ann_sk.coefs_
+                            # weight matrix
+                            annviz_weights = st.checkbox("Show weight matrix")
+                            if annviz_weights:
+                                layer_options = ["Input Layer <-> Hidden Layer 1"]
+                                if int(model_full_results["ANN information"].loc['Layers']) == 3:
+                                    layer_options += ["Hidden Layer 1 <-> Output Layer"]
+                                elif int(model_full_results["ANN information"].loc['Layers']) == 4:
+                                    layer_options += ["Hidden Layer 1 <-> Hidden Layer 2"]
+                                    layer_options += ["Hidden Layer 2 <-> Output Layer"]
+                                elif int(model_full_results["ANN information"].loc['Layers']) == 5:
+                                    layer_options += ["Hidden Layer 1 <-> Hidden Layer 2"]
+                                    layer_options += ["Hidden Layer 2 <-> Hidden Layer 3"]
+                                    layer_options += ["Hidden Layer 3 <-> Output Layer"]
+                                wei_matrix = st.selectbox('Weight matrix for following Layer', layer_options)
+                                output = [response_var]
+                                df_weights = ml.weight_matrix_func(output, expl_var, wei_matrix, coef_list)
+                                st.write(df_weights)
+                            annviz_output = st.checkbox("Show Artificial Neural Network Visualization")
+                            if annviz_output:
+                                st.write("Select which neurons of the hidden layer should be visualized:")
+                                sli_col1, sli_col2 = st.columns(2)
+                                # input layer
+                                in_sel_nod = (1,len(expl_var))
+                                # hidden layer 1
+                                hi1_nod = int(ann_finalPara['hidden layer sizes'][0][0])
+                                if hi1_nod >= 10:
+                                    hi1_def_max = 10
+                                else:
+                                    hi1_def_max = hi1_nod
+                                hi1_sel_nod = sli_col1.slider('Hidden Layer 1', min_value=1, max_value=hi1_nod, value=[1,hi1_def_max])
+                                hi_sel_tup = (hi1_sel_nod[1]-hi1_sel_nod[0]+1,)
+                                # hidden layer 2
+                                if int(model_full_results["ANN information"].loc['Layers']) >= 4:
+                                    hi2_nod = int(ann_finalPara['hidden layer sizes'][0][1])
+                                    if hi2_nod >= 10:
+                                        hi2_def_max = 10
+                                    else:
+                                        hi2_def_max = hi2_nod
+                                    hi2_sel_nod = sli_col2.slider('Hidden Layer 2', min_value=1, max_value=hi2_nod, value=[1,hi2_def_max])
+                                    hi_sel_tup += (hi2_sel_nod[1]-hi2_sel_nod[0]+1,)
+                                # hidden layer 3
+                                if int(model_full_results["ANN information"].loc['Layers']) >= 5:
+                                    hi3_nod = int(ann_finalPara['hidden layer sizes'][0][2])
+                                    if hi3_nod >= 10:
+                                        hi3_def_max = 10
+                                    else:
+                                        hi3_def_max = hi3_nod
+                                    hi3_sel_nod = sli_col1.slider('Hidden Layer 3', min_value=1, max_value=hi3_nod, value=[1,hi3_def_max])
+                                    hi_sel_tup += (hi3_sel_nod[1]-hi3_sel_nod[0]+1,)
+                                
+                                # ANN Visualization
+                                st.write("")
+                                st.warning("Very large artificial neural networks cannot be visualized clearly. Recommendation: display max. 20 neurons in one layer.")
+                                numb_output = len([response_var])
+                                network_structure = np.hstack(([in_sel_nod[1]-in_sel_nod[0]+1], np.asarray(hi_sel_tup), [numb_output]))
+                                
+                                # seperate weight matrix
+                                if int(model_full_results["ANN information"].loc['Layers']) == 3:
+                                    in_hi_wei = coef_list[0]
+                                    hi_out_wei = coef_list[1]
+                                elif int(model_full_results["ANN information"].loc['Layers']) == 4:
+                                    in_hi_wei = coef_list[0]
+                                    hi1_hi2_wei = coef_list[1]
+                                    hi_out_wei = coef_list[2]
+                                elif int(model_full_results["ANN information"].loc['Layers']) == 5:
+                                    in_hi_wei = coef_list[0]
+                                    hi1_hi2_wei = coef_list[1]
+                                    hi2_hi3_wei = coef_list[2]
+                                    hi_out_wei = coef_list[3]
+
+                                # weights for selected nodes
+                                sel_in_hi_wei = in_hi_wei[in_sel_nod[0]-1:in_sel_nod[1], hi1_sel_nod[0]-1:hi1_sel_nod[1]]
+                                sel_coef_list = [sel_in_hi_wei]
+                                # 1 hidden layer
+                                if int(model_full_results["ANN information"].loc['Layers']) == 3:
+                                    sel_hi_out_wei = hi_out_wei[hi1_sel_nod[0]-1:hi1_sel_nod[1], 0:numb_output]
+                                    sel_coef_list += [sel_hi_out_wei]
+                                # 2 hidden layer
+                                elif int(model_full_results["ANN information"].loc['Layers']) == 4:
+                                    sel_hi1_hi2_wei = hi1_hi2_wei[hi1_sel_nod[0]-1:hi1_sel_nod[1], hi2_sel_nod[0]-1:hi2_sel_nod[1]]
+                                    sel_hi_out_wei = hi_out_wei[hi2_sel_nod[0]-1:hi2_sel_nod[1], 0:numb_output]
+                                    sel_coef_list += [sel_hi1_hi2_wei]
+                                    sel_coef_list += [sel_hi_out_wei]
+                                # 3 hidden layer
+                                elif int(model_full_results["ANN information"].loc['Layers']) == 5:
+                                    sel_hi1_hi2_wei = hi1_hi2_wei[hi1_sel_nod[0]-1:hi1_sel_nod[1], hi2_sel_nod[0]-1:hi2_sel_nod[1]]
+                                    sel_hi2_hi3_wei = hi2_hi3_wei[hi2_sel_nod[0]-1:hi2_sel_nod[1], hi3_sel_nod[0]-1:hi3_sel_nod[1]]
+                                    sel_hi_out_wei = hi_out_wei[hi3_sel_nod[0]-1:hi3_sel_nod[1], 0:numb_output]
+                                    sel_coef_list += [sel_hi1_hi2_wei]
+                                    sel_coef_list += [sel_hi2_hi3_wei]
+                                    sel_coef_list += [sel_hi_out_wei]                                
+                                
+                                network=VisNN.DrawNN(network_structure, sel_coef_list)
+                                st.set_option('deprecation.showPyplotGlobalUse', False)
+                                st.write("")
+                                st.pyplot(network.draw())
                             st.write("")
                             # Loss curve (loss vs. number of iterations (epochs))
                             if ann_finalPara["weight optimization solver"][0] != "lbfgs":
@@ -3597,6 +3750,107 @@ def app():
                             if sett_hints:
                                 st.info(str(fc.learning_hints("mod_md_ANN_regStat_bin")))
                             st.write("")
+                            # ANN architecture
+                            st.write("Artificial Neural Network architecture:")
+                            coef_list = full_model_ann_sk.coefs_
+                            # weight matrix
+                            annviz_weights = st.checkbox("Show weight matrix")
+                            if annviz_weights:
+                                layer_options = ["Input Layer <-> Hidden Layer 1"]
+                                if int(model_full_results["ANN information"].loc['Layers']) == 3:
+                                    layer_options += ["Hidden Layer 1 <-> Output Layer"]
+                                elif int(model_full_results["ANN information"].loc['Layers']) == 4:
+                                    layer_options += ["Hidden Layer 1 <-> Hidden Layer 2"]
+                                    layer_options += ["Hidden Layer 2 <-> Output Layer"]
+                                elif int(model_full_results["ANN information"].loc['Layers']) == 5:
+                                    layer_options += ["Hidden Layer 1 <-> Hidden Layer 2"]
+                                    layer_options += ["Hidden Layer 2 <-> Hidden Layer 3"]
+                                    layer_options += ["Hidden Layer 3 <-> Output Layer"]
+                                wei_matrix = st.selectbox('Weight matrix for following Layer', layer_options)
+                                output = [response_var]
+                                df_weights = ml.weight_matrix_func(output, expl_var, wei_matrix, coef_list)
+                                st.write(df_weights)
+                            annviz_output = st.checkbox("Show Artificial Neural Network Visualization")
+                            if annviz_output:
+                                st.write("Select which neurons of the hidden layer should be visualized:")
+                                sli_col1, sli_col2 = st.columns(2)
+                                # input layer
+                                in_sel_nod = (1,len(expl_var))
+                                # hidden layer 1
+                                hi1_nod = int(ann_finalPara['hidden layer sizes'][0][0])
+                                if hi1_nod >= 10:
+                                    hi1_def_max = 10
+                                else:
+                                    hi1_def_max = hi1_nod
+                                hi1_sel_nod = sli_col1.slider('Hidden Layer 1', min_value=1, max_value=hi1_nod, value=[1,hi1_def_max])
+                                hi_sel_tup = (hi1_sel_nod[1]-hi1_sel_nod[0]+1,)
+                                # hidden layer 2
+                                if int(model_full_results["ANN information"].loc['Layers']) >= 4:
+                                    hi2_nod = int(ann_finalPara['hidden layer sizes'][0][1])
+                                    if hi2_nod >= 10:
+                                        hi2_def_max = 10
+                                    else:
+                                        hi2_def_max = hi2_nod
+                                    hi2_sel_nod = sli_col2.slider('Hidden Layer 2', min_value=1, max_value=hi2_nod, value=[1,hi2_def_max])
+                                    hi_sel_tup += (hi2_sel_nod[1]-hi2_sel_nod[0]+1,)
+                                # hidden layer 3
+                                if int(model_full_results["ANN information"].loc['Layers']) >= 5:
+                                    hi3_nod = int(ann_finalPara['hidden layer sizes'][0][2])
+                                    if hi3_nod >= 10:
+                                        hi3_def_max = 10
+                                    else:
+                                        hi3_def_max = hi3_nod
+                                    hi3_sel_nod = sli_col1.slider('Hidden Layer 3', min_value=1, max_value=hi3_nod, value=[1,hi3_def_max])
+                                    hi_sel_tup += (hi3_sel_nod[1]-hi3_sel_nod[0]+1,)
+                                
+                                # ANN Visualization
+                                st.write("")
+                                st.warning("Very large artificial neural networks cannot be visualized clearly. Recommendation: display max. 20 neurons in one layer.")
+                                
+                                numb_output = len([response_var])
+                                network_structure = np.hstack(([in_sel_nod[1]-in_sel_nod[0]+1], np.asarray(hi_sel_tup), [numb_output]))
+                                
+                                # seperate weight matrix
+                                if int(model_full_results["ANN information"].loc['Layers']) == 3:
+                                    in_hi_wei = coef_list[0]
+                                    hi_out_wei = coef_list[1]
+                                elif int(model_full_results["ANN information"].loc['Layers']) == 4:
+                                    in_hi_wei = coef_list[0]
+                                    hi1_hi2_wei = coef_list[1]
+                                    hi_out_wei = coef_list[2]
+                                elif int(model_full_results["ANN information"].loc['Layers']) == 5:
+                                    in_hi_wei = coef_list[0]
+                                    hi1_hi2_wei = coef_list[1]
+                                    hi2_hi3_wei = coef_list[2]
+                                    hi_out_wei = coef_list[3]
+
+                                # weights for selected nodes
+                                sel_in_hi_wei = in_hi_wei[in_sel_nod[0]-1:in_sel_nod[1], hi1_sel_nod[0]-1:hi1_sel_nod[1]]
+                                sel_coef_list = [sel_in_hi_wei]
+                                # 1 hidden layer
+                                if int(model_full_results["ANN information"].loc['Layers']) == 3:
+                                    sel_hi_out_wei = hi_out_wei[hi1_sel_nod[0]-1:hi1_sel_nod[1], 0:numb_output]
+                                    sel_coef_list += [sel_hi_out_wei]
+                                # 2 hidden layer
+                                elif int(model_full_results["ANN information"].loc['Layers']) == 4:
+                                    sel_hi1_hi2_wei = hi1_hi2_wei[hi1_sel_nod[0]-1:hi1_sel_nod[1], hi2_sel_nod[0]-1:hi2_sel_nod[1]]
+                                    sel_hi_out_wei = hi_out_wei[hi2_sel_nod[0]-1:hi2_sel_nod[1], 0:numb_output]
+                                    sel_coef_list += [sel_hi1_hi2_wei]
+                                    sel_coef_list += [sel_hi_out_wei]
+                                # 3 hidden layer
+                                elif int(model_full_results["ANN information"].loc['Layers']) == 5:
+                                    sel_hi1_hi2_wei = hi1_hi2_wei[hi1_sel_nod[0]-1:hi1_sel_nod[1], hi2_sel_nod[0]-1:hi2_sel_nod[1]]
+                                    sel_hi2_hi3_wei = hi2_hi3_wei[hi2_sel_nod[0]-1:hi2_sel_nod[1], hi3_sel_nod[0]-1:hi3_sel_nod[1]]
+                                    sel_hi_out_wei = hi_out_wei[hi3_sel_nod[0]-1:hi3_sel_nod[1], 0:numb_output]
+                                    sel_coef_list += [sel_hi1_hi2_wei]
+                                    sel_coef_list += [sel_hi2_hi3_wei]
+                                    sel_coef_list += [sel_hi_out_wei]                                
+                                
+                                network=VisNN.DrawNN(network_structure, sel_coef_list)
+                                st.set_option('deprecation.showPyplotGlobalUse', False)
+                                st.write("")
+                                st.pyplot(network.draw())
+                            st.write("")
                             # Loss curve (loss vs. number of iterations (epochs))
                             if ann_finalPara["weight optimization solver"][0] != "lbfgs":
                                 st.write("Loss curve:")
@@ -3852,7 +4106,7 @@ def app():
                                     st.write("Predictions for new data:")
                                     ANN_pred_new = pd.DataFrame(columns = [response_var])
                                     ANN_pred_new[response_var] = model_full_results["ANN prediction"]
-                                    st.write(ANN_pred_new.style.set_precision(user_precision))
+                                    st.write(ANN_pred_new.style.set_precision(user_precision))                        
 
                     #-------------------------------------------------------------
 
@@ -4016,7 +4270,7 @@ def app():
                     """,
                     unsafe_allow_html=True)
                     st.write("")
-            
+
             #--------------------------------------------------------------------------------------
             # VALIDATION OUTPUT
             
@@ -4434,7 +4688,7 @@ def app():
                     # Response variable
                     response_var_type = "multi-class"
                     response_var_options = df.columns
-                    response_var = st.selectbox("Select response variable", response_var_options, key = st.session_state['key'])
+                    response_var = st.selectbox("Select response variable", response_var_options, key = st.session_state['key'], on_change=in_wid_change)
                     
                     # Check how many classes the response variable has (max: 10 classes)
                     if len(pd.unique(df[response_var])) > 10:
@@ -4467,7 +4721,7 @@ def app():
                         # Select explanatory variables
                         expl_var_options = df.columns
                         expl_var_options = expl_var_options[expl_var_options.isin(df.drop(response_var, axis = 1).columns)]
-                        expl_var = st.multiselect("Select explanatory variables", expl_var_options, key = st.session_state['key'])
+                        expl_var = st.multiselect("Select explanatory variables", expl_var_options, key = st.session_state['key'], on_change=in_wid_change)
                         var_list = list([response_var]) + list(expl_var)
 
                         # Check if explanatory variables are numeric
@@ -4529,25 +4783,25 @@ def app():
                                 rf_finalPara["maximum number of features"] = [len(expl_var)]
                                 rf_finalPara["sample rate"] = [0.99]
                                 final_hyPara_values["rf"] = rf_finalPara
-                                if st.checkbox("Adjust settings for Random Forest "):  
+                                if st.checkbox("Adjust settings for Random Forest ", on_change=in_wid_change):  
                                     col1, col2 = st.columns(2)
                                     col3, col4 = st.columns(2)
                                     with col1:
-                                        rf_finalPara["number of trees"] = st.number_input("Number of trees", value=100, step=1, min_value=1) 
+                                        rf_finalPara["number of trees"] = st.number_input("Number of trees", value=100, step=1, min_value=1, on_change=in_wid_change) 
                                     with col3:
-                                        rf_mtd_sel = st.selectbox("Specify maximum tree depth ", ["No", "Yes"])
+                                        rf_mtd_sel = st.selectbox("Specify maximum tree depth ", ["No", "Yes"], on_change=in_wid_change)
                                         if rf_mtd_sel == "No":
                                             rf_finalPara["maximum tree depth"] = [None]
                                         if rf_mtd_sel == "Yes":
-                                            rf_finalPara["maximum tree depth"] = st.slider("Maximum tree depth ", value=20, step=1, min_value=1, max_value=50)
+                                            rf_finalPara["maximum tree depth"] = st.slider("Maximum tree depth ", value=20, step=1, min_value=1, max_value=50, on_change=in_wid_change)
                                     if len(expl_var) >1:
                                         with col4:
-                                            rf_finalPara["maximum number of features"] = st.slider("Maximum number of features ", value=len(expl_var), step=1, min_value=1, max_value=len(expl_var))
+                                            rf_finalPara["maximum number of features"] = st.slider("Maximum number of features ", value=len(expl_var), step=1, min_value=1, max_value=len(expl_var), on_change=in_wid_change)
                                         with col2:
-                                            rf_finalPara["sample rate"] = st.slider("Sample rate ", value=0.99, step=0.01, min_value=0.5, max_value=0.99)
+                                            rf_finalPara["sample rate"] = st.slider("Sample rate ", value=0.99, step=0.01, min_value=0.5, max_value=0.99, on_change=in_wid_change)
                                     else:
                                         with col2:
-                                            rf_finalPara["sample rate"] = st.slider("Sample rate ", value=0.99, step=0.01, min_value=0.5, max_value=0.99)
+                                            rf_finalPara["sample rate"] = st.slider("Sample rate ", value=0.99, step=0.01, min_value=0.5, max_value=0.99, on_change=in_wid_change)
                                     final_hyPara_values["rf"] = rf_finalPara 
                                     st.write("") 
 
@@ -4566,29 +4820,29 @@ def app():
                                     col3, col4 = st.columns(2)
                                     col5, col6 = st.columns(2)
                                     with col1:
-                                        ann_finalPara["weight optimization solver"] = st.selectbox("Weight optimization solver ", ["adam"])
+                                        ann_finalPara["weight optimization solver"] = st.selectbox("Weight optimization solver ", ["adam"], on_change=in_wid_change)
                                     with col2:
-                                        ann_finalPara["activation function"] = st.selectbox("Activation function ", ["relu", "identity", "logistic", "tanh"])
+                                        ann_finalPara["activation function"] = st.selectbox("Activation function ", ["relu", "identity", "logistic", "tanh"], on_change=in_wid_change)
                                     with col3:
-                                        ann_finalPara["maximum number of iterations"] = st.slider("Maximum number of iterations ", value=200, step=1, min_value=10, max_value=1000) 
+                                        ann_finalPara["maximum number of iterations"] = st.slider("Maximum number of iterations ", value=200, step=1, min_value=10, max_value=1000, on_change=in_wid_change) 
                                     with col4:
-                                        ann_finalPara["learning rate"] = st.slider("Learning rate  ", min_value=0.0001, max_value=0.01, value=0.001, step=1e-4, format="%.4f")
+                                        ann_finalPara["learning rate"] = st.slider("Learning rate  ", min_value=0.0001, max_value=0.01, value=0.001, step=1e-4, format="%.4f", on_change=in_wid_change)
                                     with col5:
-                                        number_hidden_layers = st.selectbox("Number of hidden layers", [1, 2, 3])
+                                        number_hidden_layers = st.selectbox("Number of hidden layers", [1, 2, 3], on_change=in_wid_change)
                                         if number_hidden_layers == 1:
-                                            number_nodes1 = st.slider("Number of nodes in hidden layer", 5, 500, 100)
+                                            number_nodes1 = st.slider("Number of nodes in hidden layer", 5, 500, 100, on_change=in_wid_change)
                                             ann_finalPara["hidden layer sizes"] = [(number_nodes1,)]
                                         if number_hidden_layers == 2:
-                                            number_nodes1 = st.slider("Number of neurons in first hidden layer", 5, 500, 100)
-                                            number_nodes2 = st.slider("Number of neurons in second hidden layer", 5, 500, 100)
+                                            number_nodes1 = st.slider("Number of neurons in first hidden layer", 5, 500, 100, on_change=in_wid_change)
+                                            number_nodes2 = st.slider("Number of neurons in second hidden layer", 5, 500, 100, on_change=in_wid_change)
                                             ann_finalPara["hidden layer sizes"] = [(number_nodes1,number_nodes2,)]
                                         if number_hidden_layers == 3:
-                                            number_nodes1 = st.slider("Number of neurons in first hidden layer", 5, 500, 100)
-                                            number_nodes2 = st.slider("Number of neurons in second hidden layer", 5, 500, 100)
-                                            number_nodes3 = st.slider("Number of neurons in third hidden layer", 5, 500, 100)
+                                            number_nodes1 = st.slider("Number of neurons in first hidden layer", 5, 500, 100, on_change=in_wid_change)
+                                            number_nodes2 = st.slider("Number of neurons in second hidden layer", 5, 500, 100, on_change=in_wid_change)
+                                            number_nodes3 = st.slider("Number of neurons in third hidden layer", 5, 500, 100, on_change=in_wid_change)
                                             ann_finalPara["hidden layer sizes"] = [(number_nodes1,number_nodes2,number_nodes3,)]
                                     with col6:
-                                        ann_finalPara["L² regularization"] = st.slider("L² regularization  ", min_value=0.00001, max_value=0.001, value=0.0001, step=1e-5, format="%.5f")                                
+                                        ann_finalPara["L² regularization"] = st.slider("L² regularization  ", min_value=0.00001, max_value=0.001, value=0.0001, step=1e-5, format="%.5f", on_change=in_wid_change)                                
 
                             #--------------------------------------------------------------------------------------
                             # HYPERPARAMETER TUNING SETTINGS
@@ -4599,7 +4853,7 @@ def app():
                                 if any(a for a in sb_ML_alg if a == "Random Forest") or any(a for a in sb_ML_alg if a == "Artificial Neural Networks"):
                                     # General settings
                                     st.markdown("**Hyperparameter-tuning settings**")
-                                    do_hypTune = st.selectbox("Use hyperparameter-tuning", ["No", "Yes"])
+                                    do_hypTune = st.selectbox("Use hyperparameter-tuning", ["No", "Yes"], on_change=in_wid_change)
                                 
                                     # Save hyperparameter values for all algorithms
                                     hyPara_values = {}
@@ -4613,14 +4867,14 @@ def app():
                                         st.warning("WARNING: Hyperparameter-tuning can take a lot of time! For tips, please [contact us](mailto:staty@quant-works.de?subject=Staty-App).")
                                         
                                         # Further general settings
-                                        hypTune_method = st.selectbox("Hyperparameter-search method", ["random grid-search", "grid-search"])
+                                        hypTune_method = st.selectbox("Hyperparameter-search method", ["random grid-search", "grid-search"], on_change=in_wid_change)
                                         col1, col2 = st.columns(2)
                                         with col1:
-                                            hypTune_nCV = st.slider("Select number for n-fold cross-validation", 2, 10, 5)
+                                            hypTune_nCV = st.slider("Select number for n-fold cross-validation", 2, 10, 5, on_change=in_wid_change)
 
                                         if hypTune_method == "random grid-search" or hypTune_method == "Bayes optimization" or hypTune_method == "sequential model-based optimization":
                                             with col2:
-                                                hypTune_iter = st.slider("Select number of iterations for search", 20, 1000, 20)
+                                                hypTune_iter = st.slider("Select number of iterations for search", 20, 1000, 20, on_change=in_wid_change)
                                         else:
                                             hypTune_iter = False
 
@@ -4637,20 +4891,20 @@ def app():
                                                 col1, col2 = st.columns(2)
                                                 col3, col4 = st.columns(2)
                                                 with col1:
-                                                    rf_tunePara["number of trees"] = st.slider("Range for number of trees ", 50, 1000, [50, 500])
+                                                    rf_tunePara["number of trees"] = st.slider("Range for number of trees ", 50, 1000, [50, 500], on_change=in_wid_change)
                                                 with col3:
-                                                    rf_mtd_choice = st.selectbox("Specify maximum tree depth", ["No", "Yes"])
+                                                    rf_mtd_choice = st.selectbox("Specify maximum tree depth", ["No", "Yes"], on_change=in_wid_change)
                                                     if rf_mtd_choice == "Yes":
-                                                        rf_tunePara["maximum tree depth"] = st.slider("Range for maximum tree depth ", 1, 50, [2, 10])
+                                                        rf_tunePara["maximum tree depth"] = st.slider("Range for maximum tree depth ", 1, 50, [2, 10], on_change=in_wid_change)
                                                     else:
                                                         rf_tunePara["maximum tree depth"] = [None, None]
                                                 with col4:
                                                     if len(expl_var) > 1:
-                                                        rf_tunePara["maximum number of features"] = st.slider("Range for maximum number of features", 1, len(expl_var), [1, len(expl_var)])
+                                                        rf_tunePara["maximum number of features"] = st.slider("Range for maximum number of features", 1, len(expl_var), [1, len(expl_var)], on_change=in_wid_change)
                                                     else:
                                                         rf_tunePara["maximum number of features"] = [1,1]
                                                 with col2:
-                                                    rf_tunePara["sample rate"] = st.slider("Range for sample rate ", 0.5, 0.99, [0.8, 0.99])
+                                                    rf_tunePara["sample rate"] = st.slider("Range for sample rate ", 0.5, 0.99, [0.8, 0.99], on_change=in_wid_change)
                                                 hyPara_values["rf"] = rf_tunePara
 
                                         # Artificial Neural Networks settings
@@ -4664,75 +4918,75 @@ def app():
                                             ann_tunePara["learning rate"] = [0.0001, 0.002]
                                             ann_tunePara["L² regularization"] = [0.00001, 0.0002]
                                             hyPara_values["ann"] = ann_tunePara
-                                            if st.checkbox("Adjust tuning settings for Artificial Neural Networks"):
+                                            if st.checkbox("Adjust tuning settings for Artificial Neural Networks", on_change=in_wid_change):
                                                 col1, col2 = st.columns(2)
                                                 col3, col4 = st.columns(2)
                                                 col5, col6 = st.columns(2)
                                                 with col1:
-                                                    weight_opt_list = st.selectbox("Weight optimization solver  ", ["adam"])
+                                                    weight_opt_list = st.selectbox("Weight optimization solver  ", ["adam"], on_change=in_wid_change)
                                                     if len(weight_opt_list) == 0:
                                                         weight_opt_list = ["adam"]
                                                         st.warning("WARNING: Default value used 'adam'")
                                                     ann_tunePara["weight optimization solver"] = list([[weight_opt_list], "NA"])
                                                 with col2:
-                                                    ann_tunePara["maximum number of iterations"] = st.slider("Maximum number of iterations (epochs) ", 10, 1000, [100, 200])
+                                                    ann_tunePara["maximum number of iterations"] = st.slider("Maximum number of iterations (epochs) ", 10, 1000, [100, 200], on_change=in_wid_change)
                                                 with col3:
-                                                    act_func_list = st.multiselect("Activation function ", ["identity", "logistic", "tanh", "relu"], ["relu"])
+                                                    act_func_list = st.multiselect("Activation function ", ["identity", "logistic", "tanh", "relu"], ["relu"], on_change=in_wid_change)
                                                     if len(act_func_list) == 0:
                                                         act_func_list = ["relu"]
                                                         st.warning("WARNING: Default value used 'relu'")
                                                     ann_tunePara["activation function"] = list([act_func_list, "NA"])
                                                 with col5:
-                                                    number_hidden_layers = st.selectbox("Number of hidden layers ", [1, 2, 3])
+                                                    number_hidden_layers = st.selectbox("Number of hidden layers ", [1, 2, 3], on_change=in_wid_change)
                                                     ann_tunePara["number of hidden layers"]  = list([number_hidden_layers, "NA"])
                                                     # Cases for hidden layers
                                                     if number_hidden_layers == 1:
-                                                        ann_tunePara["nodes per hidden layer"] = st.slider("Number of nodes in hidden layer ", 5, 500, [50, 100])
+                                                        ann_tunePara["nodes per hidden layer"] = st.slider("Number of nodes in hidden layer ", 5, 500, [50, 100], on_change=in_wid_change)
                                                     if number_hidden_layers == 2:
-                                                        number_nodes1 = st.slider("Number of neurons in first hidden layer ", 5, 500, [50, 100])
-                                                        number_nodes2 = st.slider("Number of neurons in second hidden layer ", 5, 500, [50, 100])
+                                                        number_nodes1 = st.slider("Number of neurons in first hidden layer ", 5, 500, [50, 100], on_change=in_wid_change)
+                                                        number_nodes2 = st.slider("Number of neurons in second hidden layer ", 5, 500, [50, 100], on_change=in_wid_change)
                                                         min_nodes = list([number_nodes1[0], number_nodes2[0]])
                                                         max_nodes = list([number_nodes1[1], number_nodes2[1]])
                                                         ann_tunePara["nodes per hidden layer"] = list([min_nodes, max_nodes])
                                                     if number_hidden_layers == 3:
-                                                        number_nodes1 = st.slider("Number of neurons in first hidden layer ", 5, 500, [50, 100])
-                                                        number_nodes2 = st.slider("Number of neurons in second hidden layer ", 5, 500, [50, 100])
-                                                        number_nodes3 = st.slider("Number of neurons in third hidden layer ", 5, 500, [50, 100])
+                                                        number_nodes1 = st.slider("Number of neurons in first hidden layer ", 5, 500, [50, 100], on_change=in_wid_change)
+                                                        number_nodes2 = st.slider("Number of neurons in second hidden layer ", 5, 500, [50, 100], on_change=in_wid_change)
+                                                        number_nodes3 = st.slider("Number of neurons in third hidden layer ", 5, 500, [50, 100], on_change=in_wid_change)
                                                         min_nodes = list([number_nodes1[0], number_nodes2[0], number_nodes3[0]])
                                                         max_nodes = list([number_nodes1[1], number_nodes2[1], number_nodes3[1]])
                                                         ann_tunePara["nodes per hidden layer"] = list([min_nodes, max_nodes])
                                                 with col6:
                                                     if weight_opt_list == "adam": 
-                                                        ann_tunePara["learning rate"] = st.slider("Range for learning rate ", 0.0001, 0.01, [0.0001, 0.002], step=1e-4, format="%.4f")
+                                                        ann_tunePara["learning rate"] = st.slider("Range for learning rate ", 0.0001, 0.01, [0.0001, 0.002], step=1e-4, format="%.4f", on_change=in_wid_change)
                                                 with col4:
-                                                    ann_tunePara["L² regularization"] = st.slider("L² regularization parameter ", 0.0, 0.001, [0.00001, 0.0002], step=1e-5, format="%.5f")
+                                                    ann_tunePara["L² regularization"] = st.slider("L² regularization parameter ", 0.0, 0.001, [0.00001, 0.0002], step=1e-5, format="%.5f", on_change=in_wid_change)
                                                 hyPara_values["ann"] = ann_tunePara
                                         
                                 #--------------------------------------------------------------------------------------
                                 # VALIDATION SETTINGS
 
                                 st.markdown("**Validation settings**")
-                                do_modval= st.selectbox("Use model validation", ["No", "Yes"])
+                                do_modval= st.selectbox("Use model validation", ["No", "Yes"], on_change=in_wid_change)
 
                                 if do_modval == "Yes":
                                     col1, col2 = st.columns(2)
                                     # Select training/ test ratio
                                     with col1: 
-                                        train_frac = st.slider("Select training data size", 0.5, 0.95, 0.8)
+                                        train_frac = st.slider("Select training data size", 0.5, 0.95, 0.8, on_change=in_wid_change)
 
                                     # Select number for validation runs
                                     with col2:
-                                        val_runs = st.slider("Select number for validation runs", 5, 100, 10)
+                                        val_runs = st.slider("Select number for validation runs", 5, 100, 10, on_change=in_wid_change)
 
                                 #--------------------------------------------------------------------------------------
                                 # PREDICTION SETTINGS
 
                                 st.markdown("**Model predictions**")
-                                do_modprednew = st.selectbox("Use model prediction for new data", ["No", "Yes"])
+                                do_modprednew = st.selectbox("Use model prediction for new data", ["No", "Yes"], on_change=in_wid_change)
 
                                 if do_modprednew == "Yes":
                                     # Upload new data
-                                    new_data_pred = st.file_uploader("  ", type=["csv", "txt"])
+                                    new_data_pred = st.file_uploader("  ", type=["csv", "txt"], on_change=in_wid_change)
 
                                     if new_data_pred is not None:
 
@@ -5144,20 +5398,44 @@ def app():
                                     # Full model (depending on prediction for new data)
                                     if do_modprednew == "Yes":
                                         if new_data_pred is not None:
-                                            model_full_results = ml.model_full(df, df_new, sb_ML_alg, MLR_model, MLR_finalPara, LR_finalPara, response_var_type, response_var, expl_var, final_hyPara_values, gam_finalPara)
+                                            if any(a for a in sb_ML_alg if a == "Artificial Neural Networks"):
+                                                model_full_results, full_model_ann_sk = ml.model_full(df, df_new, sb_ML_alg, MLR_model, MLR_finalPara, LR_finalPara, response_var_type, response_var, expl_var, final_hyPara_values, gam_finalPara)
+                                            else:
+                                                model_full_results = ml.model_full(df, df_new, sb_ML_alg, MLR_model, MLR_finalPara, LR_finalPara, response_var_type, response_var, expl_var, final_hyPara_values, gam_finalPara)
                                     if do_modprednew == "No":
                                         df_new = pd.DataFrame()
-                                        model_full_results = ml.model_full(df, df_new, sb_ML_alg, MLR_model, MLR_finalPara, LR_finalPara, response_var_type, response_var, expl_var, final_hyPara_values, gam_finalPara)
-                                    
+                                        if any(a for a in sb_ML_alg if a == "Artificial Neural Networks"):
+                                            model_full_results, full_model_ann_sk = ml.model_full(df, df_new, sb_ML_alg, MLR_model, MLR_finalPara, LR_finalPara, response_var_type, response_var, expl_var, final_hyPara_values, gam_finalPara)
+                                        else:
+                                            model_full_results = ml.model_full(df, df_new, sb_ML_alg, MLR_model, MLR_finalPara, LR_finalPara, response_var_type, response_var, expl_var, final_hyPara_values, gam_finalPara)
                                     # Success message
                                     st.success('Models run successfully!')
+                                    if do_hypTune == "Yes":
+                                        st.session_state['model_tuning_results'] = model_tuning_results  
+                                    st.session_state['model_full_results'] = model_full_results 
+                                    if do_modval == "Yes":
+                                        st.session_state['model_val_results'] = model_val_results  
+                                    if any(a for a in sb_ML_alg if a == "Artificial Neural Networks"):
+                                        st.session_state['full_model_ann_sk'] = full_model_ann_sk
+                                        st.session_state['ann_finalPara'] = ann_finalPara
+                                        if do_hypTune == "Yes":
+                                            st.session_state['ann_tuning_results'] = ann_tuning_results
                 else: st.error("ERROR: No data available for Modelling!") 
 
         #++++++++++++++++++++++
         # ML OUTPUT
 
-        # Show only if models were run (no further widgets after run models or the full page reloads)
-        if run_models == True:
+        # Show only if models were run
+        if st.session_state['model_full_results'] is not None and 'expl_var' in locals():
+
+            model_tuning_results = st.session_state['model_tuning_results']
+            model_full_results = st.session_state['model_full_results']
+            model_val_results = st.session_state['model_val_results']
+            if any(a for a in sb_ML_alg if a == "Artificial Neural Networks"):
+                full_model_ann_sk = st.session_state['full_model_ann_sk']
+                ann_finalPara = st.session_state['ann_finalPara']
+                ann_tuning_results = st.session_state['ann_tuning_results']
+
             st.write("")
             st.write("")
             st.header("**Model outputs**")
@@ -5362,6 +5640,106 @@ def app():
                                 st.table(ann_error_est.style.set_precision(user_precision))
                             if sett_hints:
                                 st.info(str(fc.learning_hints("mod_md_ANN_regStat_mult")))
+                            st.write("")
+                            # ANN architecture
+                            st.write("Artificial Neural Network architecture:")
+                            coef_list = full_model_ann_sk.coefs_
+                            # weight matrix
+                            annviz_weights = st.checkbox("Show weight matrix")
+                            if annviz_weights:
+                                layer_options = ["Input Layer <-> Hidden Layer 1"]
+                                if int(model_full_results["ANN information"].loc['Layers']) == 3:
+                                    layer_options += ["Hidden Layer 1 <-> Output Layer"]
+                                elif int(model_full_results["ANN information"].loc['Layers']) == 4:
+                                    layer_options += ["Hidden Layer 1 <-> Hidden Layer 2"]
+                                    layer_options += ["Hidden Layer 2 <-> Output Layer"]
+                                elif int(model_full_results["ANN information"].loc['Layers']) == 5:
+                                    layer_options += ["Hidden Layer 1 <-> Hidden Layer 2"]
+                                    layer_options += ["Hidden Layer 2 <-> Hidden Layer 3"]
+                                    layer_options += ["Hidden Layer 3 <-> Output Layer"]
+                                wei_matrix = st.selectbox('Weight matrix for following Layer', layer_options)
+                                output = np.unique(df[response_var])
+                                df_weights = ml.weight_matrix_func(output, expl_var, wei_matrix, coef_list)
+                                st.write(df_weights)
+                            annviz_output = st.checkbox("Show Artificial Neural Network Visualization")
+                            if annviz_output:
+                                st.write("Select which neurons of the hidden layer should be visualized:")
+                                sli_col1, sli_col2 = st.columns(2)
+                                # input layer
+                                in_sel_nod = (1,len(expl_var))
+                                # hidden layer 1
+                                hi1_nod = int(ann_finalPara['hidden layer sizes'][0][0])
+                                if hi1_nod >= 10:
+                                    hi1_def_max = 10
+                                else:
+                                    hi1_def_max = hi1_nod
+                                hi1_sel_nod = sli_col1.slider('Hidden Layer 1', min_value=1, max_value=hi1_nod, value=[1,hi1_def_max])
+                                hi_sel_tup = (hi1_sel_nod[1]-hi1_sel_nod[0]+1,)
+                                # hidden layer 2
+                                if int(model_full_results["ANN information"].loc['Layers']) >= 4:
+                                    hi2_nod = int(ann_finalPara['hidden layer sizes'][0][1])
+                                    if hi2_nod >= 10:
+                                        hi2_def_max = 10
+                                    else:
+                                        hi2_def_max = hi2_nod
+                                    hi2_sel_nod = sli_col2.slider('Hidden Layer 2', min_value=1, max_value=hi2_nod, value=[1,hi2_def_max])
+                                    hi_sel_tup += (hi2_sel_nod[1]-hi2_sel_nod[0]+1,)
+                                # hidden layer 3
+                                if int(model_full_results["ANN information"].loc['Layers']) >= 5:
+                                    hi3_nod = int(ann_finalPara['hidden layer sizes'][0][2])
+                                    if hi3_nod >= 10:
+                                        hi3_def_max = 10
+                                    else:
+                                        hi3_def_max = hi3_nod
+                                    hi3_sel_nod = sli_col1.slider('Hidden Layer 3', min_value=1, max_value=hi3_nod, value=[1,hi3_def_max])
+                                    hi_sel_tup += (hi3_sel_nod[1]-hi3_sel_nod[0]+1,)
+                                
+                                # ANN Visualization
+                                st.write("")
+                                st.warning("Very large artificial neural networks cannot be visualized clearly. Recommendation: display max. 20 neurons in one layer.")
+                                numb_output = len(np.unique(df[response_var]))
+                                network_structure = np.hstack(([in_sel_nod[1]-in_sel_nod[0]+1], np.asarray(hi_sel_tup), [numb_output]))
+                                
+                                # seperate weight matrix
+                                if int(model_full_results["ANN information"].loc['Layers']) == 3:
+                                    in_hi_wei = coef_list[0]
+                                    hi_out_wei = coef_list[1]
+                                elif int(model_full_results["ANN information"].loc['Layers']) == 4:
+                                    in_hi_wei = coef_list[0]
+                                    hi1_hi2_wei = coef_list[1]
+                                    hi_out_wei = coef_list[2]
+                                elif int(model_full_results["ANN information"].loc['Layers']) == 5:
+                                    in_hi_wei = coef_list[0]
+                                    hi1_hi2_wei = coef_list[1]
+                                    hi2_hi3_wei = coef_list[2]
+                                    hi_out_wei = coef_list[3]
+
+                                # weights for selected nodes
+                                sel_in_hi_wei = in_hi_wei[in_sel_nod[0]-1:in_sel_nod[1], hi1_sel_nod[0]-1:hi1_sel_nod[1]]
+                                sel_coef_list = [sel_in_hi_wei]
+                                # 1 hidden layer
+                                if int(model_full_results["ANN information"].loc['Layers']) == 3:
+                                    sel_hi_out_wei = hi_out_wei[hi1_sel_nod[0]-1:hi1_sel_nod[1], 0:numb_output]
+                                    sel_coef_list += [sel_hi_out_wei]
+                                # 2 hidden layer
+                                elif int(model_full_results["ANN information"].loc['Layers']) == 4:
+                                    sel_hi1_hi2_wei = hi1_hi2_wei[hi1_sel_nod[0]-1:hi1_sel_nod[1], hi2_sel_nod[0]-1:hi2_sel_nod[1]]
+                                    sel_hi_out_wei = hi_out_wei[hi2_sel_nod[0]-1:hi2_sel_nod[1], 0:numb_output]
+                                    sel_coef_list += [sel_hi1_hi2_wei]
+                                    sel_coef_list += [sel_hi_out_wei]
+                                # 3 hidden layer
+                                elif int(model_full_results["ANN information"].loc['Layers']) == 5:
+                                    sel_hi1_hi2_wei = hi1_hi2_wei[hi1_sel_nod[0]-1:hi1_sel_nod[1], hi2_sel_nod[0]-1:hi2_sel_nod[1]]
+                                    sel_hi2_hi3_wei = hi2_hi3_wei[hi2_sel_nod[0]-1:hi2_sel_nod[1], hi3_sel_nod[0]-1:hi3_sel_nod[1]]
+                                    sel_hi_out_wei = hi_out_wei[hi3_sel_nod[0]-1:hi3_sel_nod[1], 0:numb_output]
+                                    sel_coef_list += [sel_hi1_hi2_wei]
+                                    sel_coef_list += [sel_hi2_hi3_wei]
+                                    sel_coef_list += [sel_hi_out_wei]                                
+                                
+                                network=VisNN.DrawNN(network_structure, sel_coef_list)
+                                st.set_option('deprecation.showPyplotGlobalUse', False)
+                                st.write("")
+                                st.pyplot(network.draw())
                             st.write("")
                             # Loss curve (loss vs. number of iterations (epochs))
                             if ann_finalPara["weight optimization solver"][0] != "lbfgs":
@@ -5831,17 +6209,17 @@ def app():
                     # Select variables
                     var_options = list(df.select_dtypes(['number']).columns)
                     if len(var_options)>0:
-                        decomp_var = st.multiselect("Select variables for decomposition", var_options, var_options, key = st.session_state['key'])
+                        decomp_var = st.multiselect("Select variables for decomposition", var_options, var_options, key = st.session_state['key'], on_change=in_wid_change)
                     else:
                         st.error("ERROR: No numeric variables in dataset!")
                         return
                     
                     # Include response variable in output?
-                    resp_var_dec = st.selectbox("Include response variable in transformed data output", ["No", "Yes"], key = st.session_state['key'])
+                    resp_var_dec = st.selectbox("Include response variable in transformed data output", ["No", "Yes"], key = st.session_state['key'], on_change=in_wid_change)
                     if resp_var_dec == "Yes":
                         resp_var_options = df.columns
                         resp_var_options = resp_var_options[resp_var_options.isin(df.drop(decomp_var, axis = 1).columns)]
-                        resp_var = st.selectbox("Select response variable for transformed data output", resp_var_options, key = st.session_state['key'])
+                        resp_var = st.selectbox("Select response variable for transformed data output", resp_var_options, key = st.session_state['key'], on_change=in_wid_change)
 
                     # Filter data according to selected variables
                     if len(decomp_var) < 2:

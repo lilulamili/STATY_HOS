@@ -41,7 +41,7 @@ from difflib import SequenceMatcher
 def app():
 
     # Clear cache
-    st.legacy_caching.clear_cache()
+    #st.legacy_caching.clear_cache()
 
     # Hide traceback in error messages (comment out for de-bugging)
     sys.tracebacklimit = 0
@@ -99,6 +99,10 @@ def app():
         fc.theme_func_light()
     fc.theme_func_dl_button()
 
+    def cc():
+        st.legacy_caching.clear_cache()
+        st.session_state['load_data_button'] = None
+
     #++++++++++++++++++++++++++++++++++++++++++++
     # Text Mining
     #++++++++++++++++++++++++++++++++++++++++++++
@@ -106,9 +110,10 @@ def app():
     basic_text="Let STATY do text/web processing for you and start exploring your data stories right below... "
     
     st.header('**Web scraping and text data**')
-    tw_meth = ['Text analysis','Web-Page summary','Stock data analysis']
-    tw_classifier = st.selectbox('What analysis would you like to perform?', list('-')+tw_meth, key = st.session_state['key'])
+    tw_meth = ['Text analysis','Web-Page summary','Stock data analysis', 'Financial analysis']
+    tw_classifier = st.selectbox('What analysis would you like to perform?', list('-')+tw_meth, key = st.session_state['key'], on_change=cc)
     
+
     if tw_classifier in tw_meth:
         st.write("")
         st.write("")
@@ -116,7 +121,9 @@ def app():
         st.markdown(basic_text)
         
     if tw_classifier=='Web-Page summary': 
-
+        
+        # Clear cache
+        st.legacy_caching.clear_cache()
           
         user_path = st.text_input("What what web page should I summarize in five sentences for you?","https://en.wikipedia.org/wiki/Data_mining")
         
@@ -159,7 +166,11 @@ def app():
                     st.text("")
                     pysumMain(user_path)
 
-    if tw_classifier =='Stock data analysis':   
+    if tw_classifier =='Stock data analysis':  
+
+        # Clear cache
+        st.legacy_caching.clear_cache()
+
         # dwonload first the list of comanies in the S&P500 and DAX indices
         payload=pd.read_html('https://en.wikipedia.org/wiki/List_of_S%26P_500_companies')
         first_table = payload[0]
@@ -309,6 +320,10 @@ def app():
                     st.write(yf.Ticker(selected_symbol).info ['longBusinessSummary'])
 
     if tw_classifier=='Text analysis':
+
+        # Clear cache
+        st.legacy_caching.clear_cache()
+        
         run_text_OK=False
         text_cv = CountVectorizer()
         
@@ -660,8 +675,716 @@ def app():
                 # Success message
                 #st.success('Text processing completed')
                 
+    if tw_classifier=='Financial analysis': 
+        
+        # FUNCTIONS
+        
+        # download list of companies
+        @st.cache()
+        def load_ticker():
+            # S&P500 companies
+            payload = pd.read_html('https://en.wikipedia.org/wiki/List_of_S%26P_500_companies')
+            df = payload[0]
+            global list_symbols_SP
+            list_symbols_SP = df.iloc[:,0].values.tolist()
+            list_companys_SP = df.iloc[:,1].values.tolist()
+            list_subindustry_SP = df.iloc[:,4].values.tolist()
+            list_stockindex_SP = []
+            for i in range(len(list_symbols_SP)):
+                list_stockindex_SP += ["S&P500"]
 
-                             
-                            
+            #adjust sectors
+            payload_GICS = pd.read_html('https://en.wikipedia.org/wiki/Global_Industry_Classification_Standard')
+            df_GICS = payload_GICS[0]
+            df_GICS = pd.DataFrame({'Industry Group': df_GICS.iloc[:,3], 'Sub-Industry': df_GICS.iloc[:,7]})
+            df_GICS.set_index('Sub-Industry', inplace=True)
+
+            df_sector = pd.DataFrame({'Sub-Industry': list_subindustry_SP, 'Industry Group': ''})
+            df_sector.set_index('Sub-Industry', inplace=True)
+            df_sector['Industry Group'] = df_sector.index.map(df_GICS['Industry Group'])
+
+            list_sectors_SP = df_sector['Industry Group'].values.tolist()
             
-    
+            #---------------------------------------------------------------------------------------------
+            #DAX companies
+            payload1 = pd.read_html('https://en.wikipedia.org/wiki/DAX')
+            df1 = payload1[3]
+            global list_symbols_DAX
+            list_symbols_DAX = df1.iloc[:,3].values.tolist()
+            list_companys_DAX = df1.iloc[:,1].values.tolist()
+            list_sectors_DAX = df1.iloc[:,2].values.tolist()
+            list_stockindex_DAX = []
+            for i in range(len(list_symbols_DAX)):
+                list_stockindex_DAX += ["DAX"]
+
+            #---------------------------------------------------------------------------------------------
+            #FTSE companies
+            payload2 = pd.read_html('https://en.wikipedia.org/wiki/FTSE_100_Index')
+            df2 = payload2[3]
+            df2.iloc[:,1] = df2.iloc[:,1] + '.L'
+            global list_symbols_FTSE
+            list_symbols_FTSE = df2.iloc[:,1].values.tolist()
+            list_companys_FTSE = df2.iloc[:,0].values.tolist()
+            list_sectors_FTSE = df2.iloc[:,2].values.tolist()
+            list_stockindex_FTSE = []
+            for i in range(len(list_symbols_FTSE)):
+                list_stockindex_FTSE += ["FTSE 100"]
+
+            #---------------------------------------------------------------------------------------------
+            # merge into one dataframe
+            list_symbols = list_symbols_SP + list_symbols_DAX + list_symbols_FTSE
+            list_companys = list_companys_SP + list_companys_DAX + list_companys_FTSE
+            list_sectors = list_sectors_SP + list_sectors_DAX + list_sectors_FTSE
+            list_stockindex = list_stockindex_SP + list_stockindex_DAX + list_stockindex_FTSE
+
+            df_indicesdata = pd.DataFrame({'Ticker': list_symbols, 'Company': list_companys, 'Sector': list_sectors, 'Stock index': list_stockindex})
+            
+            return df_indicesdata, list_symbols_SP, list_symbols_DAX, list_symbols_FTSE
+        
+        # define ticker object
+        @st.cache(allow_output_mutation=True)
+        def function_ticker():
+            ticker = []
+            for i in range(len(list_symbols)):
+                ticker.append(Class_ticker())
+            return ticker
+
+        # delete session state if input widget change
+        def in_wid_change():
+            st.session_state['load_data_button'] = None
+        
+        # function for multiselect ticker vs. company
+        def ticker_dict_func(option):
+            return ticker_dict[option]
+        
+        # function for multiselect index vs. company
+        def index_dict_func(option):
+            return ticker[option].company
+
+        # create df_selected
+        @st.cache(allow_output_mutation=True)
+        def function_df_selected():
+            df_selected = pd.DataFrame(columns=['Ticker', 'Company', 'Sector'])
+            index_list_rename = []
+
+            for i in range(len(selected_stock)):
+                df_selected = df_selected.append(df_indicesdata[df_indicesdata['Ticker']==selected_stock[i]])
+                index_list_rename += [i+1]
+
+            index_list = df_selected.index.tolist()
+            df_selected.index = index_list_rename
+            return df_selected, index_list
+
+        def data_available(label, source, selected_year):
+            if label in source.index and source.at[label, selected_year] is not None and source.at[label, selected_year] != 0 :
+                return True
+            else:
+                return False
+
+        # calculate average
+        def average_func(index_list, df_selected, df):
+            if len(index_list) > 1:
+                if len(df_selected['Stock index'])*2 == (len(df_selected[df_selected['Stock index']==df_selected.at[1, 'Stock index']])+len(df_selected[df_selected['Sector']==df_selected.at[1, 'Sector']])):
+                    means = df.mean(axis=1)
+                    df.insert(0, 'average' , means)
+            return df
+
+        # create df
+        def fill_df_func(df, ticker, i, label_index, label_column):
+            if df.empty:
+                df = pd.DataFrame(ticker[i].kpis, index=label_index, columns=[label_column])
+            else:
+                df.insert(len(df.columns) , label_column, ticker[i].kpis)
+            return df
+
+        #----------------------------------------------------------------------------------------------
+        # define class of tickers
+        class Class_ticker:
+            # master data
+            def __init__(self):
+                self.symbol = None
+                self.company = None
+                self.sector = None
+                self.dict = None
+
+            def master_data(self, i):
+                self.symbol = list_symbols[i]
+                self.company = list_companys[i]
+                self.sector = list_sectors[i]
+                self.stockindex = list_stockindex[i]
+                
+            # data loading
+            def load_data(self):
+                self.data = yf.Ticker(self.symbol)
+            
+            #----------------------------------------------------------------------------------------------
+            # calculate kpis
+
+            #profitability
+            def kpi_profitability(self, selected_year):
+                if data_available('Ebit', self.fi, selected_year) and data_available('Total Assets', self.bs, selected_year):
+                    self.roi = self.fi.at['Ebit', selected_year] / self.bs.at['Total Assets', selected_year] * 100
+                else:
+                    self.roi = np.nan
+                if data_available('Ebit', self.fi, selected_year) and data_available('Total Stockholder Equity', self.bs, selected_year):
+                    self.roe = self.fi.at['Ebit', selected_year] / self.bs.at['Total Stockholder Equity', selected_year] * 100
+                else:
+                    self.roe = np.nan
+                if data_available('Total Revenue', self.fi, selected_year):
+                    self.revenues = self.fi.at['Total Revenue', selected_year] / 1000000000
+                else:
+                    self.revenues = np.nan
+                if data_available('Ebit', self.fi, selected_year) and data_available('Depreciation', self.cf, selected_year) and data_available('Total Revenue', self.fi, selected_year):
+                    self.ebitda_margin = (self.fi.at['Ebit', selected_year] + self.cf.at['Depreciation', selected_year]) / self.fi.at['Total Revenue', selected_year] *100
+                else:
+                    self.ebitda_margin = np.nan
+                if data_available('Ebit', self.fi, selected_year) and data_available('Total Revenue', self.fi, selected_year):
+                    self.ebit_margin = self.fi.at['Ebit', selected_year] / self.fi.at['Total Revenue', selected_year] * 100
+                else:
+                    self.ebit_margin = np.nan
+                self.kpis = [self.roi, self.roe, self.revenues, self.ebitda_margin, self.ebit_margin]
+
+            #debt capital
+            def kpi_debt_capital(self, selected_year):
+                if data_available('Total Liab', self.bs, selected_year) and data_available('Cash', self.bs, selected_year) and data_available('Ebit', self.fi, selected_year) and data_available('Depreciation', self.cf, selected_year):
+                    self.netdebt_ebitda = (self.bs.at['Total Liab', selected_year] - self.bs.at['Cash', selected_year]) / (self.fi.at['Ebit', selected_year] + self.cf.at['Depreciation', selected_year])
+                else:
+                    self.netdebt_ebitda = np.nan
+                if data_available('Ebit', self.fi, selected_year) and data_available('Depreciation', self.cf, selected_year) and data_available('Interest Expense', self.fi, selected_year):
+                    self.ebita_interest = (self.fi.at['Ebit', selected_year] + self.cf.at['Depreciation', selected_year]) / self.fi.at['Interest Expense', selected_year] * -1 
+                else:
+                    self.ebita_interest = np.nan
+                if data_available('Total Current Liabilities', self.bs, selected_year) and data_available('Total Current Assets', self.bs, selected_year):
+                    self.current_ratio = self.bs.at['Total Current Liabilities', selected_year] / self.bs.at['Total Current Assets', selected_year]
+                else:
+                    self.current_ratio = np.nan
+                if data_available('Accounts Payable', self.bs, selected_year) and data_available('Cost Of Revenue', self.fi, selected_year) :
+                    self.dpo = self.bs.at['Accounts Payable', selected_year] * 365 / self.fi.at['Cost Of Revenue', selected_year]
+                else:
+                    self.dpo = np.nan
+                self.kpis = [self.netdebt_ebitda, self.ebita_interest, self.current_ratio, self.dpo]
+
+            #equity capital
+            def kpi_equity_capital(self):
+                if 'revenuePerShare' in self.info:
+                    self.revenuepershare = self.info['revenuePerShare']
+                else:
+                    self.revenuepershare = np.nan    
+                if 'forwardEps' in self.info:
+                    self.eps = self.info['forwardEps']
+                else:
+                    self.eps = np.nan    
+                if 'dividendRate' in self.info:
+                    self.dividendrate = self.info['dividendRate']
+                else:
+                    self.dividendrate = np.nan    
+                self.kpis = [self.revenuepershare, self.eps, self.dividendrate]
+
+            #valuation
+            def kpi_valuation(self):
+                if 'forwardPE' in self.info:
+                    self.forwardPE = self.info['forwardPE']
+                else:
+                    self.forwardPE = np.nan
+                if 'pegRatio' in self.info:
+                    self.pegratio = self.info['pegRatio']
+                else:
+                    self.pegratio = np.nan
+                if 'priceToBook' in self.info:
+                    self.pricetobook = self.info['priceToBook']
+                else:
+                    self.pricetobook = np.nan
+                if 'enterpriseValue' in self.info:
+                    self.ev = self.info['enterpriseValue'] / 1000000000
+                else:
+                    self.ev = np.nan
+                if 'enterpriseToRevenue' in self.info:
+                    self.evtorevenue = self.info['enterpriseToRevenue']
+                else:
+                    self.evtorevenue = np.nan
+                if 'enterpriseToEbitda' in self.info:
+                    self.evtoebitda = self.info['enterpriseToEbitda']
+                else:
+                    self.evtoebitda = np.nan
+                self.kpis = [self.forwardPE, self.pegratio, self.pricetobook, self.ev, self.evtorevenue, self.evtoebitda]
+                
+            def stock_history(self):
+                self.history = self.data.history(period=str(stock_period))
+
+            #capital procurement
+            def kpi_capital_procurement(self, selected_year):
+                if data_available('Total Cash From Operating Activities', self.cf, selected_year) and data_available('Total Cashflows From Investing Activities', self.cf, selected_year):
+                    self.selffinancingratio = self.cf.at['Total Cash From Operating Activities', selected_year]/ self.cf.at['Total Cashflows From Investing Activities', selected_year] * -1
+                else:
+                    self.selffinancingratio = np.nan
+                if data_available('Total Stockholder Equity', self.bs, selected_year) and data_available('Total Assets', self.bs, selected_year):
+                    self.equityratio = self.bs.at['Total Stockholder Equity', selected_year] / self.bs.at['Total Assets', selected_year] * 100
+                else:
+                    self.equityratio = np.nan            
+                self.kpis = [self.selffinancingratio, self.equityratio]
+            
+            #capital allocation
+            def kpi_capital_allocation(self, selected_year):
+                if data_available('Capital Expenditures', self.cf, selected_year):
+                    self.capexrevenueratio = self.cf.at['Capital Expenditures', selected_year] * -1 / self.fi.at['Total Revenue', selected_year] 
+                else:
+                    self.capexrevenueratio = np.nan
+                if data_available('Research Development', self.fi, selected_year):
+                    self.RDrevenueratio = self.fi.at['Research Development', selected_year] / self.fi.at['Total Revenue', selected_year]
+                else:
+                    self.RDrevenueratio = np.nan
+                if data_available('Inventory', self.bs, selected_year) and data_available('Net Receivables', self.bs, selected_year):
+                    self.ccc = (self.bs.at['Inventory', selected_year] * 365 / self.fi.at['Total Revenue', selected_year]) + (self.bs.at['Net Receivables', selected_year] * 365 / self.fi.at['Total Revenue', selected_year]) - self.dpo   
+                else:
+                    self.ccc = np.nan
+                self.kpis = [self.capexrevenueratio, self.RDrevenueratio, self.ccc]
+
+            #procurement market
+            def kpi_procurement_market(self, selected_year):
+                if selected_year == self.fi.columns[0] and 'fullTimeEmployees' in self.info and data_available('Total Revenue', self.fi, selected_year):
+                    self.labour_productivity = self.fi.at['Total Revenue', self.fi.columns[0]] / 1000 / self.info['fullTimeEmployees'] 
+                else:
+                    self.labour_productivity = np.nan
+                if data_available('Total Revenue', self.fi, selected_year) and data_available('Net Receivables', self.bs, selected_year):
+                    self.asset_turnover = self.fi.at['Total Revenue', selected_year] / self.bs.at['Net Receivables', selected_year] * 100
+                else:
+                    self.asset_turnover = np.nan
+                self.kpis = [self.labour_productivity, self.asset_turnover]
+        
+        #----------------------------------------------------------------------------------------------
+        # load ticker
+        df_indicesdata, list_symbols_SP, list_symbols_DAX, list_symbols_FTSE = load_ticker()
+        list_symbols = df_indicesdata['Ticker'].values.tolist()
+        list_companys = df_indicesdata['Company'].values.tolist()
+        list_sectors = df_indicesdata['Sector'].values.tolist()
+        list_stockindex = df_indicesdata['Stock index'].values.tolist()
+
+        # define ticker object and load data
+        ticker = function_ticker()
+
+        # create dictonary, master data, load data
+        ticker_dict = {}
+        for i in range(len(list_symbols)):
+            ticker[i].master_data(i)
+            ticker_dict[ticker[i].symbol] = ticker[i].company
+            ticker[i].load_data()
+
+        # check session state
+        if 'selected_stock' not in st.session_state:
+            st.session_state['selected_stock'] = None
+        if 'load_data_button' not in st.session_state:
+            st.session_state['load_data_button'] = None
+        if 'list_years' not in st.session_state:
+            st.session_state['list_years'] = None
+        #----------------------------------------------------------------------------------------------
+        
+        # select ticker for KPI-Dashboard
+        co1 = st.container()
+        st.write('Selection options include the following stock indices:')
+        c1, c2, c3 = st.columns(3)
+        ticker_options = []
+        SP500 = c1.checkbox('S&P 500', True, on_change=in_wid_change)
+        DAX = c2.checkbox('DAX', True, on_change=in_wid_change)
+        FTSE = c3.checkbox('FTSE', True, on_change=in_wid_change)
+
+        if SP500:
+            ticker_options += list_symbols_SP
+        if DAX:
+            ticker_options += list_symbols_DAX
+        if FTSE:
+            ticker_options += list_symbols_FTSE
+        
+        if SP500:
+            default = 'MSFT'
+        elif DAX:
+            default = 'VOW3.DE'
+        elif FTSE:
+            default = 'VOD.L'
+        else:
+            st.error('Please select at least one stock index.')
+            st.stop()
+        
+        selected_stock = co1.multiselect('Enter a stock ticker symbol', ticker_options, default , format_func=ticker_dict_func, on_change=in_wid_change)
+
+        if selected_stock == []:
+            st.error('Please select at least one ticker.')
+            st.session_state['selected_stock'] = None
+            st.stop()
+
+        # ticker from the same sector for 1 selection only
+        if len(selected_stock) == 1:
+            sector_list = []
+            sector_ticker = []
+            sector_list = df_indicesdata[df_indicesdata['Ticker']==selected_stock[0]].index.tolist()
+            for i in range(len(ticker)):
+                if ticker[i].sector == ticker[sector_list[0]].sector and ticker[i].stockindex == ticker[sector_list[0]].stockindex and ticker[i].company != ticker[sector_list[0]].company:
+                    sector_list += [i]
+                    sector_ticker += [ticker[i].symbol]
+
+            c1 = st.container()
+            c2 = st.container()
+            select_all = c2.checkbox('Select all companies of '+ ticker[sector_list[0]].sector + ' in ' + ticker[sector_list[0]].stockindex + ' (can take some time)', on_change=in_wid_change)
+            if select_all:
+                sector_comparison = c1.multiselect('Select a Ticker from the same sector and stock index for comparison', sector_ticker, sector_ticker, format_func=ticker_dict_func, on_change=in_wid_change)
+            else:
+                sector_comparison = c1.multiselect('Select a Ticker from the same sector and stock index for comparison', sector_ticker, format_func=ticker_dict_func, on_change=in_wid_change)
+            selected_stock += sector_comparison
+        else: select_all = None
+
+        # create df_selected
+        df_selected, index_list = function_df_selected()
+        
+        st.write('**Your selection:**')
+        st.write(df_selected)
+
+        # company information
+        if len(index_list) < 6:
+            for i in index_list:
+                if st.checkbox('Show company information for ' + ticker[i].company):
+                    st.write(ticker[i].data.info['longBusinessSummary'])
+        else: 
+            company_info = st.multiselect('Show company information for ', index_list, format_func=index_dict_func)
+            for i in company_info:
+                st.markdown('Company information for ' + ticker[i].company)
+                st.write(ticker[i].data.info['longBusinessSummary'])
+
+        st.dataframe(ticker[i].data.financials)
+        #----------------------------------------------------------------------------------------------
+        ######## DATA LOADING #########
+        b1, b2, b3, b4, b5 = st.columns(5)
+        load_data_button = b1.button('Load Data')
+        if b5.button('Clear Cache', on_click=in_wid_change):
+            st.legacy_caching.clear_cache()
+        if load_data_button:
+            st.session_state['load_data_button'] = load_data_button
+
+        if st.session_state['load_data_button']:
+
+            c3 = st.container()
+            my_bar = st.progress(0.0)
+            progress_sum = len(index_list) + 7
+            progress = 0
+
+            if selected_stock != st.session_state['selected_stock'] or load_data_button:
+                st.session_state['selected_stock'] = selected_stock
+                list_years = []
+                for i in index_list:
+                    ticker[i].bs = ticker[i].data.balance_sheet
+                    if ticker[i].bs.empty:
+                        index_list.remove(i)
+                        st.warning('No data found for ' + ticker[i].company)
+                    else:
+                        ticker[i].bs.columns = pd.DatetimeIndex(ticker[i].bs.columns).year
+                        for element in ticker[i].bs.columns:
+                            if element not in list_years:
+                                list_years.append(element)
+                        ticker[i].cf = ticker[i].data.cashflow
+                        ticker[i].cf.columns = pd.DatetimeIndex(ticker[i].cf.columns).year
+                        ticker[i].fi = ticker[i].data.financials
+                        ticker[i].fi.columns = pd.DatetimeIndex(ticker[i].fi.columns).year
+                        ticker[i].info = ticker[i].data.info
+                        # check and adjust duplicate years
+                        list_columns = ticker[i].bs.columns.values.tolist()
+                        for n in range(len(ticker[i].bs.columns)):
+                            if any(ticker[i].bs.columns.duplicated()):
+                                list_duplicate_bool = ticker[i].bs.columns.duplicated()
+                                index_duplicate = [i for i, x in enumerate(list_duplicate_bool) if x]
+                                list_columns[index_duplicate[0]] = list_columns[index_duplicate[0]]-1
+                                ticker[i].bs.columns = list_columns
+                                ticker[i].cf.columns = list_columns
+                                ticker[i].fi.columns = list_columns
+
+                    progress += 1
+                    my_bar.progress(progress/progress_sum)
+
+                # sort list of years
+                list_years.sort(reverse=True)
+                st.session_state['list_years'] = list_years
+            else: 
+                list_years = st.session_state['list_years']
+                progress += len(index_list)
+                my_bar.progress(progress/progress_sum)
+
+            #----------------------------------------------------------------------------------------------
+            # header
+            if len(index_list) == 1:
+                header_profitability = 'Profitability of ' + ticker[index_list[0]].company
+                header_debt_capital = 'Debt Capital of ' + ticker[index_list[0]].company
+                header_equity_capital = 'Equity Capital of ' + ticker[index_list[0]].company
+                header_valuation = 'Valuation of ' + ticker[index_list[0]].company
+                header_capital_procurement = 'Capital Procurement of ' + ticker[index_list[0]].company
+                header_capital_allocation = 'Capital Allocation of ' + ticker[index_list[0]].company
+                header_procurement_market = 'Procurement Market of ' + ticker[index_list[0]].company
+            else:
+                header_profitability = 'Profitability'
+                header_debt_capital = 'Debt Capital'
+                header_equity_capital = 'Equity Capital'
+                header_valuation = 'Valuation'
+                header_capital_procurement = 'Capital Procurement'
+                header_capital_allocation = 'Capital Allocation'
+                header_procurement_market = 'Procurement Market'
+            
+            st.subheader('KPI-Dashboard')
+            #----------------------------------------------------------------------------------------------
+            # profitability
+            with st.expander(header_profitability):
+                
+                label_index = 'Return on Investment (ROI) [in %]', 'Return on Equity (ROE) [in %]', 'Total Revenue [in billion]', 'EBITDA-Margin [in %]', 'EBIT-Margin [in %]'
+                df_profitability = pd.DataFrame()
+
+                if len(index_list) == 1:        
+                    for y in ticker[index_list[0]].bs.columns:
+                        ticker[index_list[0]].kpi_profitability(y)
+                        df_profitability = fill_df_func(df_profitability, ticker, index_list[0], label_index, y)
+                if len(index_list) > 1:
+                    selected_year =  st.selectbox('select year', list_years, key=1)
+                    for i in index_list:
+                        if selected_year in ticker[i].bs.columns:
+                            ticker[i].kpi_profitability(selected_year)
+                        else:
+                            ticker[i].kpis = np.empty(len(label_index))
+                            ticker[i].kpis.fill(np.nan)
+
+                        df_profitability = fill_df_func(df_profitability, ticker, i, label_index, ticker[i].company)
+                    
+                    df_profitability = average_func(index_list, df_selected, df_profitability)
+
+                st.dataframe(df_profitability.style.format("{:.2f}"))
+            #progress
+            progress += 1
+            my_bar.progress(progress/progress_sum)
+            
+            #----------------------------------------------------------------------------------------------
+            # debt capital
+            with st.expander(header_debt_capital):
+                
+                label_index = 'Net Debt/EBITDA', 'EBITDA/Interest', 'Current Ratio', 'Days Payable Outstanding [in days]'
+                df_debt_capital = pd.DataFrame()
+
+                if len(index_list) == 1:        
+                    for y in ticker[index_list[0]].bs.columns:
+                        ticker[index_list[0]].kpi_debt_capital(y)
+                        df_debt_capital = fill_df_func(df_debt_capital, ticker, index_list[0], label_index, y)
+                if len(index_list) > 1:
+                    selected_year =  st.selectbox('select year', list_years, key=2)
+                    for i in index_list:
+                        if selected_year in ticker[i].bs.columns:
+                            ticker[i].kpi_debt_capital(selected_year)
+                        else:
+                            ticker[i].kpis = np.empty(len(label_index))
+                            ticker[i].kpis.fill(np.nan)
+
+                        df_debt_capital = fill_df_func(df_debt_capital, ticker, i, label_index, ticker[i].company)
+                    
+                    df_debt_capital = average_func(index_list, df_selected, df_debt_capital)
+
+                st.dataframe(df_debt_capital.style.format("{:.2f}"))
+            #progress
+            progress += 1
+            my_bar.progress(progress/progress_sum)
+
+            #----------------------------------------------------------------------------------------------
+            # equity capital
+
+            with st.expander(header_equity_capital):
+
+                label_index = 'Revenues per Share', ' Forward EPS', 'Forward Annual Dividend Rate' 
+                df_equity_capital = pd.DataFrame()
+                
+                for i in index_list:
+                    ticker[i].kpi_equity_capital()
+                    df_equity_capital = fill_df_func(df_equity_capital, ticker, i, label_index, ticker[i].company)
+
+                df_equity_capital = average_func(index_list, df_selected, df_equity_capital)                
+
+                st.dataframe(df_equity_capital.style.format("{:.2f}"))
+            #progress
+            progress += 1
+            my_bar.progress(progress/progress_sum)
+
+            #----------------------------------------------------------------------------------------------
+            # valuation
+            with st.expander(header_valuation):
+
+                label_index = 'Forward P/E', 'PEG Ratio (5yr expected)', 'P/B Ratio', 'Enterprise Value (EV) [in billion]', 'EV/Revenue', 'EV/EBITDA' 
+                df_valuation = pd.DataFrame()
+
+                for i in index_list:
+                    ticker[i].kpi_valuation()
+                    df_valuation = fill_df_func(df_valuation, ticker, i, label_index, ticker[i].company)
+
+                df_valuation = average_func(index_list, df_selected, df_valuation)                
+                st.dataframe(df_valuation.style.format(formatter="{:.2f}"))
+                st.write('')
+
+                #Visualization of stock price
+                st.write('**Stock Price**')
+                # Selection of parameter
+                if len(index_list) == 1:
+                    stock_para = st.multiselect('Select parameter for stock price visualization', ['Open', 'High', 'Low', 'Close', 'Volume'], 'Open')
+                elif len(index_list) > 1:
+                    stock_para = st.selectbox('Select parameter for stock price visualization', ['Open', 'High', 'Low', 'Close', 'Volume'])
+                
+                stock_period = st.selectbox('Select period for stock price visualization', ['max','10y','5y','2y','1y','ytd','6mo','3mo','1mo','5d', '1d'], 4)
+                if len(index_list) == 1:
+                    ticker[index_list[0]].history = ticker[index_list[0]].data.history(period=str(stock_period))
+                    df_history = pd.DataFrame()
+                    selected_para = []
+                    for stock_para in stock_para:
+                        if df_history.empty:
+                            df_history = pd.DataFrame(ticker[index_list[0]].history[stock_para])
+                            selected_para += [stock_para]
+                        else:
+                            df_history.insert(len(df_history.columns) , stock_para, ticker[index_list[0]].history[stock_para])
+                            selected_para += [stock_para]
+                    df_history.columns = selected_para
+                elif len(index_list) > 1 and len(index_list) < 6:
+                    df_history = pd.DataFrame()
+                    selected_company = []
+                    for i in index_list:
+                        ticker[i].history = ticker[i].data.history(period=str(stock_period))
+                        if df_history.empty:
+                            df_history = pd.DataFrame(ticker[i].history[stock_para])
+                            selected_company += [ticker[i].company]
+                        else:
+                            df_history.insert(len(df_history.columns) , ticker[i].company, ticker[i].history[stock_para])
+                            selected_company += [ticker[i].company]
+                    df_history.columns = selected_company
+                else:
+                    df_history = pd.DataFrame()
+                    selected_company = []
+
+                    for i in st.multiselect('Select company for visualization', index_list, index_list[0], format_func=index_dict_func):
+                        ticker[i].history = ticker[i].data.history(period=str(stock_period))
+                        if df_history.empty:
+                            df_history = pd.DataFrame(ticker[i].history[stock_para])
+                            selected_company += [ticker[i].company]
+                        else:
+                            df_history.insert(len(df_history.columns) , ticker[i].company, ticker[i].history[stock_para])
+                            selected_company += [ticker[i].company]
+                    df_history.columns = selected_company
+
+                st.line_chart(df_history)
+            #progress
+            progress += 1
+            my_bar.progress(progress/progress_sum)
+
+            #----------------------------------------------------------------------------------------------
+            # capital procurement
+            with st.expander(header_capital_procurement):
+                
+                label_index = 'Self-Financing Ratio', 'Equity Ratio [in %]'
+                df_capital_procurement = pd.DataFrame()
+
+                if len(index_list) == 1:        
+                    for y in ticker[index_list[0]].bs.columns:
+                        ticker[index_list[0]].kpi_capital_procurement(y)
+                        df_capital_procurement = fill_df_func(df_capital_procurement, ticker, index_list[0], label_index, y)
+                if len(index_list) > 1:
+                    selected_year =  st.selectbox('select year', list_years, key=5)
+                    for i in index_list:
+                        if selected_year in ticker[i].bs.columns:
+                            ticker[i].kpi_capital_procurement(selected_year)
+                        else:
+                            ticker[i].kpis = np.empty(len(label_index))
+                            ticker[i].kpis.fill(np.nan)
+
+                        df_capital_procurement = fill_df_func(df_capital_procurement, ticker, i, label_index, ticker[i].company)
+                    
+                    df_capital_procurement = average_func(index_list, df_selected, df_capital_procurement)
+
+                st.dataframe(df_capital_procurement.style.format("{:.2f}"))
+            #progress
+            progress += 1
+            my_bar.progress(progress/progress_sum)
+
+            #----------------------------------------------------------------------------------------------
+            # capital allocation
+            with st.expander(header_capital_allocation):
+                
+                label_index = 'CapEx/Revenue', 'Research & Development/Revenue', 'Cash Conversion Cycle [in days]'
+                df_capital_allocation = pd.DataFrame()
+
+                if len(index_list) == 1:        
+                    for y in ticker[index_list[0]].bs.columns:
+                        ticker[index_list[0]].kpi_capital_allocation(y)
+                        df_capital_allocation = fill_df_func(df_capital_allocation, ticker, index_list[0], label_index, y)
+                if len(index_list) > 1:
+                    selected_year =  st.selectbox('select year', list_years, key=6)
+                    for i in index_list:
+                        if selected_year in ticker[i].bs.columns:
+                            ticker[i].kpi_capital_allocation(selected_year)
+                        else:
+                            ticker[i].kpis = np.empty(len(label_index))
+                            ticker[i].kpis.fill(np.nan)
+
+                        df_capital_allocation = fill_df_func(df_capital_allocation, ticker, i, label_index, ticker[i].company)
+                    
+                    df_capital_allocation = average_func(index_list, df_selected, df_capital_allocation)
+
+                st.dataframe(df_capital_allocation.style.format("{:.2f}"))
+            #progress
+            progress += 1
+            my_bar.progress(progress/progress_sum)
+
+            #----------------------------------------------------------------------------------------------
+            # procurement market
+            with st.expander(header_procurement_market):
+                
+                label_index = 'Labour Productivity [in T per employee]', 'Asset turnover [in %]'
+                df_procurement_market = pd.DataFrame()
+
+                if len(index_list) == 1:        
+                    for y in ticker[index_list[0]].bs.columns:
+                        ticker[index_list[0]].kpi_procurement_market(y)
+                        df_procurement_market = fill_df_func(df_procurement_market, ticker, index_list[0], label_index, y)
+                if len(index_list) > 1:
+                    selected_year =  st.selectbox('select year', list_years, key=7)
+                    for i in index_list:
+                        if selected_year in ticker[i].bs.columns:
+                            ticker[i].kpi_procurement_market(selected_year)
+                        else:
+                            ticker[i].kpis = np.empty(len(label_index))
+                            ticker[i].kpis.fill(np.nan)
+
+                        df_procurement_market = fill_df_func(df_procurement_market, ticker, i, label_index, ticker[i].company)
+                    
+                    df_procurement_market = average_func(index_list, df_selected, df_procurement_market)
+
+                st.dataframe(df_procurement_market.style.format("{:.2f}"))
+            #progress
+            progress += 1
+            my_bar.progress(progress/progress_sum)
+            if progress == progress_sum:
+                c3.success('Data loading is completed!')
+
+            #download excel file
+            output = BytesIO()
+            excel_file = pd.ExcelWriter(output, engine="xlsxwriter")
+            df_profitability.to_excel(excel_file, sheet_name='KPI-Dashboard', startrow=3)
+            worksheet = excel_file.sheets['KPI-Dashboard']
+            worksheet.write(1, 0, header_profitability)
+            df_debt_capital.to_excel(excel_file, sheet_name='KPI-Dashboard', startrow=12)
+            worksheet.write(10, 0, header_debt_capital)
+            df_equity_capital.to_excel(excel_file, sheet_name='KPI-Dashboard', startrow=20)
+            worksheet.write(18, 0, header_equity_capital)
+            df_valuation.to_excel(excel_file, sheet_name='KPI-Dashboard', startrow=27)
+            worksheet.write(25, 0, header_valuation)
+            df_capital_procurement.to_excel(excel_file, sheet_name='KPI-Dashboard', startrow=37)
+            worksheet.write(35, 0, header_capital_procurement)
+            df_capital_allocation.to_excel(excel_file, sheet_name='KPI-Dashboard', startrow=43)
+            worksheet.write(41, 0, header_capital_allocation)
+            df_procurement_market.to_excel(excel_file, sheet_name='KPI-Dashboard', startrow=50)
+            worksheet.write(48, 0, header_procurement_market)
+
+            excel_file.save()
+            excel_file = output.getvalue()
+            b64 = base64.b64encode(excel_file)
+            dl_file_name = "Financial Analysis.xlsx"
+            st.markdown(
+                f"""
+            <a href="data:file/excel_file;base64,{b64.decode()}" id="button_dl" download="{dl_file_name}">Download KPI-Dashboard</a>
+            """,
+            unsafe_allow_html=True)                            
+                
+        
