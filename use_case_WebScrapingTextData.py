@@ -1048,7 +1048,6 @@ def app():
                 st.markdown('Company information for ' + ticker[i].company)
                 st.write(ticker[i].data.info['longBusinessSummary'])
 
-        st.dataframe(ticker[i].data.financials)
         #----------------------------------------------------------------------------------------------
         ######## DATA LOADING #########
         b1, b2, b3, b4, b5 = st.columns(5)
